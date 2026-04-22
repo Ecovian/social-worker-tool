@@ -67,7 +67,7 @@ export default function Export() {
     try {
       const exports = await import('../lib/exportUtils');
 
-      if (key === 'journal-pdf') await exports.exportJournalPDF(filteredJournals);
+      if (key === 'journal-pdf') await exports.exportJournalFormPDF(filteredJournals);
       if (key === 'journal-xlsx') await exports.exportJournalXLSX(filteredJournals);
       if (key === 'journal-docx') await exports.exportJournalDOCX(filteredJournals);
       if (key === 'budget-pdf') await exports.exportBudgetPDF(budgetItems, budgetMeta);
@@ -133,7 +133,7 @@ export default function Export() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <ExportButton format="pdf" label="양식 PDF" loading={loading === 'journal-pdf'} disabled={filteredJournals.length === 0} onClick={() => handleExport('journal-pdf')} />
+            <ExportButton format="pdf" label="양식 PDF (공식서식)" loading={loading === 'journal-pdf'} disabled={filteredJournals.length === 0} onClick={() => handleExport('journal-pdf')} />
             <ExportButton format="xlsx" label="양식 엑셀" loading={loading === 'journal-xlsx'} disabled={filteredJournals.length === 0} onClick={() => handleExport('journal-xlsx')} />
             <ExportButton format="docx" label="양식 DOCX" loading={loading === 'journal-docx'} disabled={filteredJournals.length === 0} onClick={() => handleExport('journal-docx')} />
           </div>

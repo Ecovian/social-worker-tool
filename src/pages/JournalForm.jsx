@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Camera,
   Copy,
+  FileDown,
   PlusCircle,
   RefreshCcw,
   Save,
@@ -372,6 +373,17 @@ export default function JournalForm() {
   const [suggestionPreview, setSuggestionPreview] = useState(null);
   const [favoriteTypes, setFavoriteTypes] = useState(getFavoriteJournalTypes());
   const [recentTypes, setRecentTypes] = useState(getRecentJournalTypes());
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function handlePdfDownload() {
+    setPdfLoading(true);
+    try {
+      const { exportSingleJournalPDF } = await import('../lib/exportUtils');
+      await exportSingleJournalPDF(form);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   const draftKey = getDraftKey(isNew, selectedType || form.type, id);
   const currentType = selectedType || form.type;
@@ -714,6 +726,17 @@ export default function JournalForm() {
               <ArrowLeft size={14} />
               목록으로
             </Link>
+            {!isNew && (
+              <button
+                type="button"
+                onClick={handlePdfDownload}
+                disabled={pdfLoading}
+                className="btn-secondary disabled:opacity-50"
+              >
+                <FileDown size={14} />
+                {pdfLoading ? 'PDF 생성 중...' : 'PDF 저장'}
+              </button>
+            )}
             {isNew && (
               <button
                 type="button"
