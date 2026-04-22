@@ -23,7 +23,7 @@ export default function DataManagement() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `사회복지업무_백업_${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.download = `양식도구_백업_${new Date().toISOString().slice(0, 10)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
       showToast('백업 파일을 다운로드했습니다.');
@@ -76,20 +76,20 @@ export default function DataManagement() {
   return (
     <div className="animate-fade-in max-w-3xl">
       <PageHeader
-        title="데이터 관리"
-        subtitle="다종 일지, 아동 정보, 예산, 사진, 임시저장을 한 번에 백업하고 복원합니다."
+        title="백업/복원"
+        subtitle="5개 공식 양식 기록, 아동 정보, 예산, 첨부 사진을 한 번에 백업하고 복원합니다."
       />
 
       <div className="space-y-5">
         <div className="card p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-700 shrink-0">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
               <Download size={20} />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-gray-900">백업 내보내기</p>
-              <p className="text-sm text-gray-500 mt-1">
-                현재 저장된 다종 일지, 아동 정보, 예산, 임시저장, IndexedDB 사진까지 모두 JSON 파일로 저장합니다.
+              <p className="font-semibold text-gray-900">백업 파일 만들기</p>
+              <p className="mt-1 text-sm text-gray-500">
+                현재 저장된 놀이계획서, 초기상담기록지, 면담일지, 활동일지와 아동 정보, 예산, 사진을 JSON 파일로 저장합니다.
               </p>
               <button type="button" onClick={handleExport} disabled={loading === 'export'} className="btn-primary mt-4">
                 <Download size={14} />
@@ -101,13 +101,13 @@ export default function DataManagement() {
 
         <div className="card p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-700 shrink-0">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
               <Upload size={20} />
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900">백업 복원</p>
-              <p className="text-sm text-gray-500 mt-1">
-                백업 파일을 복원하면 현재 기기의 로컬 데이터와 사진 저장소가 해당 파일의 상태로 교체됩니다.
+              <p className="mt-1 text-sm text-gray-500">
+                백업 파일을 복원하면 현재 기기의 로컬 데이터와 사진 저장소가 백업 파일 내용으로 교체됩니다.
               </p>
               <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleSelectFile} />
               <button type="button" onClick={() => fileRef.current?.click()} className="btn-secondary mt-4">
@@ -119,33 +119,33 @@ export default function DataManagement() {
         </div>
 
         <div className="card p-5">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="mb-3 flex items-center gap-2">
             <Database size={16} className="text-primary-600" />
-            <p className="text-sm font-semibold text-gray-800">백업 파일에 포함되는 항목</p>
+            <p className="text-sm font-semibold text-gray-900">백업에 포함되는 항목</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
-            <div className="rounded-xl bg-gray-50 p-4">10종 일지, 보호자 연락 일지, 그룹 활동 연결 정보</div>
-            <div className="rounded-xl bg-gray-50 p-4">아동 기본정보, 메모, 보호자 연락처</div>
+          <div className="grid gap-3 text-sm text-gray-600 md:grid-cols-2">
+            <div className="rounded-xl bg-gray-50 p-4">놀이계획서(개별), 놀이계획서(소그룹/집단), 초기상담기록지, 면담일지, 활동일지</div>
+            <div className="rounded-xl bg-gray-50 p-4">아동 기본정보, 보호자 정보, 메모</div>
             <div className="rounded-xl bg-gray-50 p-4">예산 메타데이터와 지출 항목</div>
-            <div className="rounded-xl bg-gray-50 p-4">자동 저장 초안과 사진 저장소</div>
+            <div className="rounded-xl bg-gray-50 p-4">임시저장 초안과 첨부 사진 저장소</div>
           </div>
         </div>
       </div>
 
       {restoreTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
                 <AlertTriangle size={18} />
               </div>
               <div>
                 <p className="font-semibold text-gray-900">백업 파일을 복원할까요?</p>
-                <p className="text-sm text-gray-500 mt-1">현재 기기의 데이터가 모두 교체됩니다.</p>
+                <p className="mt-1 text-sm text-gray-500">현재 기기에 저장된 데이터가 모두 교체됩니다.</p>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-gray-50 p-4 mt-4 text-sm text-gray-600 space-y-2">
+            <div className="mt-4 space-y-2 rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
               <p>파일명: {restoreTarget.fileName}</p>
               <p>백업 시각: {restoreTarget.exportedAt ? new Date(restoreTarget.exportedAt).toLocaleString('ko-KR') : '정보 없음'}</p>
               <p>버전: v{restoreTarget.version}</p>
@@ -155,7 +155,7 @@ export default function DataManagement() {
               </p>
             </div>
 
-            <div className="flex gap-2 justify-end mt-5">
+            <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setRestoreTarget(null)} className="btn-secondary">
                 취소
               </button>
@@ -168,7 +168,7 @@ export default function DataManagement() {
       )}
 
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm shadow-lg ${
+        <div className={`fixed bottom-6 right-6 z-50 rounded-xl px-4 py-3 text-sm shadow-lg ${
           toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'
         }`}>
           <div className="inline-flex items-center gap-2">

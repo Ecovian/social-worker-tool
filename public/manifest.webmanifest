@@ -1,14 +1,16 @@
 {
-  "name": "지역아동센터 업무도구",
-  "short_name": "업무도구",
-  "description": "다종 일지, 출결, 보호자 연락, 예산 관리를 위한 로컬 저장형 PWA",
-  "start_url": "/",
+  "name": "지역아동센터 양식도구",
+  "short_name": "양식도구",
+  "description": "놀이계획서, 초기상담기록지, 면담일지, 활동일지와 예산 관리를 위한 로컬 저장형 PWA",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#0264ca",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "./favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

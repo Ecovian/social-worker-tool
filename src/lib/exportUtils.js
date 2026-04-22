@@ -16,7 +16,7 @@ import {
 } from 'docx';
 import { format } from 'date-fns';
 import { getPhotoDataUrl } from './photoStore';
-import { attendanceLabel, journalTypeLabel, riskFlagLabel } from './storage';
+import { JOURNAL_TYPES, journalTypeLabel } from './storage';
 
 let fontBase64 = null;
 
@@ -51,20 +51,62 @@ async function createPdf(orientation = 'p') {
   return doc;
 }
 
+function buildJournalBody(journal) {
+  if (journal.type === JOURNAL_TYPES.PLAY_PLAN_INDIVIDUAL) {
+    return [
+      journal.currentLevel ? `현행 수준: ${journal.currentLevel}` : '',
+      journal.playGoal ? `놀이 목표: ${journal.playGoal}` : '',
+      journal.planRows?.length ? `계획 행 수: ${journal.planRows.length}개` : '',
+      journal.summary ? `메모: ${journal.summary}` : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  if (journal.type === JOURNAL_TYPES.PLAY_PLAN_GROUP) {
+    return [
+      journal.participantChildrenSummary ? `참여 아동: ${journal.participantChildrenSummary}` : '',
+      journal.matchingGoal ? `매칭 특성 및 목표: ${journal.matchingGoal}` : '',
+      journal.groupPlan ? `놀이 활동 계획: ${journal.groupPlan}` : '',
+      journal.neededMaterials ? `준비물: ${journal.neededMaterials}` : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  if (journal.type === JOURNAL_TYPES.INTERVIEW_LOG) {
+    return [
+      journal.intervieweeName ? `면담자: ${journal.intervieweeName}` : '',
+      journal.consultationMethod ? `면담 방식: ${journal.consultationMethod}` : '',
+      journal.consultationContent ? `상담 내용: ${journal.consultationContent}` : '',
+      journal.futurePlan ? `향후 계획: ${journal.futurePlan}` : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  if (journal.type === JOURNAL_TYPES.INITIAL_CONSULTATION) {
+    return [
+      journal.healthNotes ? `건강상 특이사항: ${journal.healthNotes}` : '',
+      journal.favoriteThings ? `즐겨 하는 것: ${journal.favoriteThings}` : '',
+      journal.serviceGoals ? `서비스 기대: ${journal.serviceGoals}` : '',
+      journal.cautionBehavior ? `주의 사항: ${journal.cautionBehavior}` : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  return [
+    journal.activitySubject ? `활동 주제: ${journal.activitySubject}` : '',
+    journal.detailedActivities ? `세부 활동내용: ${journal.detailedActivities}` : '',
+    journal.content ? `관찰내용: ${journal.content}` : '',
+    journal.activityEvaluation ? `활동 평가: ${journal.activityEvaluation}` : '',
+  ].filter(Boolean).join('\n');
+}
+
 function journalRows(journals) {
   return journals.map((journal) => ({
-    날짜: journal.date || '',
+    날짜: journal.date || journal.writerDate || '',
     시간: journal.time || '',
-    아동: journal.childName || '',
-    유형: journalTypeLabel(journal.type),
-    상태: journal.status === 'finalized' ? '확정' : '임시 저장',
+    아동명: journal.childName || '',
+    양식종류: journalTypeLabel(journal.type),
+    저장상태: journal.status === 'finalized' ? '확정본' : '임시저장',
     제목: journal.title || '',
-    출결: journal.attendanceStatus ? attendanceLabel(journal.attendanceStatus) : '',
     요약: journal.summary || '',
-    본문: journal.content || '',
-    위험징후: (journal.riskFlags || []).map(riskFlagLabel).join(', '),
-    후속조치: journal.followUpText || '',
-    보호자연락필요: journal.guardianContactNeeded ? '예' : '아니오',
+    본문: buildJournalBody(journal),
+    사진수: journal.photos?.length || 0,
   }));
 }
 
@@ -87,19 +129,19 @@ export async function exportJournalPDF(journals) {
   const doc = await createPdf('p');
 
   doc.setFontSize(18);
-  doc.text('다종 일지 출력', 14, 18);
+  doc.text('공식 양식 기록 출력', 14, 18);
   doc.setFontSize(10);
   doc.text(`생성일시 ${format(new Date(), 'yyyy-MM-dd HH:mm')}`, 14, 25);
 
   autoTable(doc, {
     startY: 32,
-    head: [['날짜', '아동', '유형', '제목', '상태']],
+    head: [['날짜', '아동명', '양식종류', '제목', '상태']],
     body: journals.map((journal) => [
-      journal.date || '',
+      journal.date || journal.writerDate || '',
       journal.childName || '',
       journalTypeLabel(journal.type),
       journal.title || '',
-      journal.status === 'finalized' ? '확정' : '임시 저장',
+      journal.status === 'finalized' ? '확정본' : '임시저장',
     ]),
     styles: { font: 'NanumGothic', fontSize: 9 },
     headStyles: { fillColor: [2, 100, 202], font: 'NanumGothic' },
@@ -118,43 +160,40 @@ export async function exportJournalPDF(journals) {
     doc.text(`${journalTypeLabel(journal.type)} · ${journal.title || '제목 없음'}`, 14, y);
     y += 6;
     doc.setFontSize(9);
-    doc.text(`아동 ${journal.childName || '-'} / 날짜 ${journal.date || '-'} ${journal.time || ''}`, 14, y);
+    doc.text(`아동 ${journal.childName || '-'} / 날짜 ${journal.date || journal.writerDate || '-'} ${journal.time || ''}`, 14, y);
     y += 5;
-    doc.text(`출결 ${journal.attendanceStatus ? attendanceLabel(journal.attendanceStatus) : '-'} / 사진 ${photoCount}장`, 14, y);
+    doc.text(`상태 ${journal.status === 'finalized' ? '확정본' : '임시저장'} / 사진 ${photoCount}장`, 14, y);
     y += 5;
-    const bodyLines = doc.splitTextToSize(journal.summary || journal.content || '내용 없음', 180);
+    const bodyLines = doc.splitTextToSize(buildJournalBody(journal) || journal.summary || '내용 없음', 180);
     doc.text(bodyLines, 14, y);
     y += bodyLines.length * 4.2 + 5;
   }
 
-  doc.save('다종일지.pdf');
+  doc.save('공식양식기록.pdf');
 }
 
 export async function exportJournalXLSX(journals) {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.json_to_sheet(journalRows(journals));
   sheet['!cols'] = [
-    { wch: 12 },
-    { wch: 8 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 10 },
-    { wch: 28 },
-    { wch: 10 },
-    { wch: 24 },
-    { wch: 48 },
-    { wch: 18 },
-    { wch: 18 },
     { wch: 14 },
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 22 },
+    { wch: 12 },
+    { wch: 28 },
+    { wch: 28 },
+    { wch: 60 },
+    { wch: 10 },
   ];
-  XLSX.utils.book_append_sheet(workbook, sheet, '일지');
-  XLSX.writeFile(workbook, '다종일지.xlsx');
+  XLSX.utils.book_append_sheet(workbook, sheet, '양식기록');
+  XLSX.writeFile(workbook, '공식양식기록.xlsx');
 }
 
 export async function exportJournalDOCX(journals) {
   const children = [
     new Paragraph({
-      text: '다종 일지 출력',
+      text: '공식 양식 기록 출력',
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
       spacing: { after: 200 },
@@ -168,13 +207,10 @@ export async function exportJournalDOCX(journals) {
         heading: HeadingLevel.HEADING_2,
       }),
       new Paragraph({
-        text: `아동 ${journal.childName || '-'} / 날짜 ${journal.date || '-'} ${journal.time || ''} / 상태 ${journal.status === 'finalized' ? '확정' : '임시 저장'}`,
+        text: `아동 ${journal.childName || '-'} / 날짜 ${journal.date || journal.writerDate || '-'} ${journal.time || ''} / 상태 ${journal.status === 'finalized' ? '확정본' : '임시저장'}`,
       }),
       new Paragraph({
-        text: `출결 ${journal.attendanceStatus ? attendanceLabel(journal.attendanceStatus) : '-'} / 위험 ${journal.riskFlags.length > 0 ? journal.riskFlags.map(riskFlagLabel).join(', ') : '없음'}`,
-      }),
-      new Paragraph({
-        text: journal.summary || journal.content || '내용 없음',
+        text: buildJournalBody(journal) || journal.summary || '내용 없음',
         spacing: { after: 180 },
       }),
     );
@@ -185,7 +221,7 @@ export async function exportJournalDOCX(journals) {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, '다종일지.docx');
+  saveAs(blob, '공식양식기록.docx');
 }
 
 export async function exportBudgetPDF(items, meta) {
@@ -194,7 +230,7 @@ export async function exportBudgetPDF(items, meta) {
   const totalSpent = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   doc.setFontSize(18);
-  doc.text(meta.title || '예산표', 14, 18);
+  doc.text(meta.title || '예산', 14, 18);
   doc.setFontSize(10);
   doc.text(`${meta.year}년 ${meta.month}월`, 14, 25);
   doc.text(`총예산 ${totalBudget.toLocaleString()}원 / 지출 ${totalSpent.toLocaleString()}원`, 14, 31);
@@ -215,7 +251,7 @@ export async function exportBudgetPDF(items, meta) {
     footStyles: { font: 'NanumGothic', fillColor: [240, 249, 244], textColor: [0, 0, 0] },
   });
 
-  doc.save('예산표.pdf');
+  doc.save('예산.pdf');
 }
 
 export async function exportBudgetXLSX(items, meta) {
@@ -224,13 +260,13 @@ export async function exportBudgetXLSX(items, meta) {
   rows.unshift({
     날짜: '',
     카테고리: '',
-    항목명: `${meta.year}년 ${meta.month}월 ${meta.title || '예산표'}`,
+    항목명: `${meta.year}년 ${meta.month}월 ${meta.title || '예산'}`,
     금액: Number(meta.totalBudget) || 0,
     비고: '총 예산',
   });
   const sheet = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(workbook, sheet, '예산');
-  XLSX.writeFile(workbook, '예산표.xlsx');
+  XLSX.writeFile(workbook, '예산.xlsx');
 }
 
 export async function exportBudgetDOCX(items, meta) {
@@ -256,7 +292,7 @@ export async function exportBudgetDOCX(items, meta) {
     sections: [{
       children: [
         new Paragraph({
-          text: meta.title || '예산표',
+          text: meta.title || '예산',
           heading: HeadingLevel.HEADING_1,
           alignment: AlignmentType.CENTER,
         }),
@@ -273,5 +309,5 @@ export async function exportBudgetDOCX(items, meta) {
   });
 
   const blob = await Packer.toBlob(document);
-  saveAs(blob, '예산표.docx');
+  saveAs(blob, '예산.docx');
 }

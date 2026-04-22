@@ -1,215 +1,170 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import {
-  AlertTriangle,
-  ArrowRight,
-  BookOpen,
-  CalendarCheck2,
-  MessageSquareMore,
-  PlusCircle,
-  Users,
-} from 'lucide-react';
+import { ArrowRight, ClipboardList, PlusCircle, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import {
-  getClients,
   getDashboardSnapshot,
   getJournals,
-  getMonthlyCareSummary,
+  JOURNAL_TYPE_OPTIONS,
   journalTypeLabel,
 } from '../lib/storage';
 
 export default function Dashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const snapshot = getDashboardSnapshot(today);
-  const clients = getClients();
   const journals = getJournals();
-
-  const monthlyOverview = useMemo(() => {
-    const month = today.slice(0, 7);
-    const monthlyJournals = journals.filter((journal) => (journal.date || '').startsWith(month));
-    const typeCounts = monthlyJournals.reduce((acc, journal) => {
-      acc[journal.type] = (acc[journal.type] || 0) + 1;
-      return acc;
-    }, {});
-
-    return Object.entries(typeCounts)
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 5);
-  }, [journals, today]);
-
-  const latestHighlights = snapshot.latestJournals.slice(0, 6);
+  const latestEntries = snapshot.latestJournals.slice(0, 6);
 
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="오늘의 업무 대시보드"
-        subtitle={`${today} 기준으로 출결, 후속조치, 보호자 연락 필요 건을 먼저 확인합니다.`}
+        title="양식 대시보드"
+        subtitle={`${today} 기준으로 5개 공식 양식 작성 현황을 한눈에 확인할 수 있습니다.`}
         actions={(
-          <div className="flex gap-2 flex-wrap">
-            <Link to="/attendance" className="btn-secondary">
-              <CalendarCheck2 size={14} />
-              출결 빠른 입력
-            </Link>
+          <div className="flex flex-wrap gap-2">
             <Link to="/journal/new" className="btn-primary">
               <PlusCircle size={14} />
-              새 일지
+              새 양식 작성
+            </Link>
+            <Link to="/journals" className="btn-secondary">
+              <ClipboardList size={14} />
+              양식 목록
             </Link>
           </div>
         )}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="오늘 출결 미입력" value={`${snapshot.missingAttendanceClients.length}명`} tone="primary" icon={<CalendarCheck2 size={18} />} />
-        <StatCard label="귀가 미확인" value={`${snapshot.missingDeparture.length}건`} tone="amber" icon={<AlertTriangle size={18} />} />
-        <StatCard label="후속조치 필요" value={`${snapshot.followUpNeeded.length}건`} tone="red" icon={<BookOpen size={18} />} />
-        <StatCard label="보호자 연락 필요" value={`${snapshot.guardianPending.length}건`} tone="sage" icon={<MessageSquareMore size={18} />} />
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="등록 아동" value={`${snapshot.clientCount}명`} tone="primary" />
+        <StatCard label="이번 달 작성 양식" value={`${snapshot.monthlyCount}건`} tone="sage" />
+        <StatCard label="임시저장 양식" value={`${snapshot.draftCount}건`} tone="amber" />
+        <StatCard label="전체 저장 양식" value={`${journals.length}건`} tone="rose" />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-6">
-        <ActionCard
-          title="오늘 출결 미입력 아동"
-          actionLabel="출결 입력"
-          actionTo="/attendance"
-          items={snapshot.missingAttendanceClients.map((client) => client.name)}
-          emptyLabel="오늘 출결이 모두 입력되었습니다."
-        />
-        <ActionCard
-          title="후속조치 필요한 기록"
-          actionLabel="일지 목록"
-          actionTo="/journals"
-          items={snapshot.followUpNeeded.map((journal) => `${journal.childName} · ${journal.title}`)}
-          emptyLabel="후속조치가 필요한 임시 기록이 없습니다."
-        />
-        <ActionCard
-          title="보호자 연락 필요 건"
-          actionLabel="연락 일지 작성"
-          actionTo="/journal/new"
-          items={snapshot.guardianPending.map((journal) => `${journal.childName} · ${journal.title}`)}
-          emptyLabel="추가 연락이 필요한 기록이 없습니다."
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="card p-5">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">이번 달 일지 유형 현황</p>
-              <p className="text-xs text-gray-400 mt-1">다종 일지 입력 비중을 바로 확인할 수 있습니다.</p>
-            </div>
-            <Link to="/statistics" className="text-sm text-primary-600 hover:text-primary-700 inline-flex items-center gap-1">
-              통계 보기
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {monthlyOverview.length === 0 ? (
-              <p className="text-sm text-gray-400">이번 달 기록이 아직 없습니다.</p>
-            ) : (
-              monthlyOverview.map(([type, count]) => (
-                <div key={type} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
-                  <span className="text-sm text-gray-700">{journalTypeLabel(type)}</span>
-                  <span className="text-sm font-semibold text-gray-900">{count}건</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">최근 입력된 기록</p>
-              <p className="text-xs text-gray-400 mt-1">최근 6건을 빠르게 다시 열어 수정할 수 있습니다.</p>
-            </div>
-            <Link to="/journals" className="text-sm text-primary-600 hover:text-primary-700 inline-flex items-center gap-1">
-              전체 보기
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {latestHighlights.length === 0 ? (
-              <p className="text-sm text-gray-400">아직 작성된 기록이 없습니다.</p>
-            ) : (
-              latestHighlights.map((journal) => (
-                <Link key={journal.id} to={`/journal/${journal.id}`} className="block rounded-xl border border-gray-200 px-4 py-3 hover:border-primary-300 hover:bg-primary-50/30 transition-colors">
-                  <p className="text-sm font-semibold text-gray-900">{journal.title || journalTypeLabel(journal.type)}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {journal.childName || '대상 없음'} · {journal.date} · {journalTypeLabel(journal.type)}
-                  </p>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="card p-5 mt-6">
-        <p className="text-sm font-semibold text-gray-800 mb-4">아동별 이번 달 요약 바로가기</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {clients.slice(0, 6).map((client) => {
-            const summary = getMonthlyCareSummary({
-              clientId: client.id,
-              month: today.slice(0, 7),
-            });
-
-            return (
-              <Link key={client.id} to="/clients" className="rounded-xl border border-gray-200 p-4 hover:border-primary-300 hover:bg-primary-50/30 transition-colors">
-                <p className="font-semibold text-gray-900">{client.name}</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  일지 {summary.journals.length}건 · 연락 {summary.guardianContacts.length}건 · 위험 {summary.riskCount}건
-                </p>
+      <div className="grid gap-5 xl:grid-cols-[1.15fr,0.85fr]">
+        <div className="space-y-5">
+          <div className="card p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">이번 달 양식 분포</p>
+                <p className="mt-1 text-xs text-gray-400">현재는 제공하신 5개 공식 양식만 작성할 수 있습니다.</p>
+              </div>
+              <Link to="/statistics" className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700">
+                통계 보기
+                <ArrowRight size={14} />
               </Link>
-            );
-          })}
-          {clients.length === 0 && <p className="text-sm text-gray-400">등록된 아동이 아직 없습니다.</p>}
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {JOURNAL_TYPE_OPTIONS.map((option) => (
+                <div key={option.value} className="rounded-2xl border border-gray-200 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`badge border ${option.color}`}>{option.shortLabel}</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      {snapshot.monthlyTypeCounts[option.value] || 0}건
+                    </span>
+                  </div>
+                  <p className="mt-3 font-medium text-gray-900">{option.label}</p>
+                  <p className="mt-1 text-sm text-gray-500">{option.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">최근 입력 양식</p>
+                <p className="mt-1 text-xs text-gray-400">최근 저장한 양식을 바로 이어서 수정할 수 있습니다.</p>
+              </div>
+              <Link to="/journals" className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700">
+                전체 보기
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {latestEntries.length === 0 ? (
+                <p className="text-sm text-gray-400">아직 작성된 양식이 없습니다.</p>
+              ) : (
+                latestEntries.map((journal) => (
+                  <Link
+                    key={journal.id}
+                    to={`/journal/${journal.id}`}
+                    className="block rounded-2xl border border-gray-200 px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/30"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="badge bg-gray-100 text-gray-700">{journalTypeLabel(journal.type)}</span>
+                      <span className={`badge ${journal.status === 'finalized' ? 'bg-sage-50 text-sage-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {journal.status === 'finalized' ? '확정본' : '임시저장'}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-semibold text-gray-900">{journal.title || journalTypeLabel(journal.type)}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {journal.childName || '아동명 미입력'} · {journal.date}
+                    </p>
+                    {(journal.summary || journal.activitySubject || journal.playGoal) && (
+                      <p className="mt-2 line-clamp-2 text-sm text-gray-600">
+                        {journal.summary || journal.activitySubject || journal.playGoal}
+                      </p>
+                    )}
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div className="card p-5">
+            <p className="text-sm font-semibold text-gray-900">빠른 시작</p>
+            <div className="mt-4 space-y-3">
+              {JOURNAL_TYPE_OPTIONS.map((option) => (
+                <Link
+                  key={option.value}
+                  to={`/journal/new?type=${option.value}`}
+                  className="flex items-center justify-between rounded-2xl border border-gray-200 px-4 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50/30"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{option.label}</p>
+                    <p className="text-sm text-gray-500">{option.shortLabel}</p>
+                  </div>
+                  <ArrowRight size={16} className="text-primary-600" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
+                <Users size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">아동별 양식 확인</p>
+                <p className="text-xs text-gray-400">초기상담, 놀이계획, 면담, 활동일지를 아동별로 모아서 볼 수 있습니다.</p>
+              </div>
+            </div>
+            <Link to="/clients" className="btn-secondary mt-4">
+              아동 관리로 이동
+            </Link>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, tone, icon }) {
+function StatCard({ label, value, tone }) {
   const toneMap = {
     primary: 'bg-primary-50 text-primary-700',
-    amber: 'bg-amber-50 text-amber-700',
-    red: 'bg-red-50 text-red-700',
     sage: 'bg-sage-50 text-sage-700',
+    amber: 'bg-amber-50 text-amber-700',
+    rose: 'bg-rose-50 text-rose-700',
   };
 
   return (
     <div className="card p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${toneMap[tone]}`}>
-          {icon}
-        </div>
-        <p className="text-sm text-gray-500">{label}</p>
-      </div>
+      <div className={`mb-3 inline-flex rounded-xl px-3 py-1.5 text-xs font-semibold ${toneMap[tone]}`}>{label}</div>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
-    </div>
-  );
-}
-
-function ActionCard({ title, actionLabel, actionTo, items, emptyLabel }) {
-  return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <p className="text-sm font-semibold text-gray-800">{title}</p>
-        <Link to={actionTo} className="text-sm text-primary-600 hover:text-primary-700 inline-flex items-center gap-1">
-          {actionLabel}
-          <ArrowRight size={14} />
-        </Link>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-gray-400">{emptyLabel}</p>
-      ) : (
-        <div className="space-y-2">
-          {items.slice(0, 6).map((item) => (
-            <div key={item} className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
-              {item}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
