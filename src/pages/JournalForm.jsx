@@ -4,14 +4,17 @@ import {
   AlertCircle,
   ArrowLeft,
   Camera,
+  ChevronDown,
   Copy,
   FileDown,
   PlusCircle,
   RefreshCcw,
   Save,
+  Search,
   Sparkles,
   Star,
   Trash2,
+  UserRound,
   X,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
@@ -49,6 +52,16 @@ const PERIOD_MONTHS = {
   상반기: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월'],
   하반기: ['9월', '10월', '11월', '12월'],
 };
+
+function calcAgeFromBirth(birthDate) {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
 
 function getDraftKey(isNew, selectedType, id) {
   return isNew ? `new:${selectedType || 'select'}` : id;
@@ -227,6 +240,118 @@ function TRadio({ options, value, onChange }) {
           {opt}
         </label>
       ))}
+    </div>
+  );
+}
+
+// ── ClientPickerModal ─────────────────────────────────────────────────────────
+
+function ClientPickerModal({ clients, selectedId, onSelect, onClose, onAddNew }) {
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter((c) =>
+      [c.name, c.guardian, c.phone, c.guardianPhone]
+        .filter(Boolean)
+        .some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [clients, query]);
+
+  function ageLabel(birthDate) {
+    const age = calcAgeFromBirth(birthDate);
+    return age !== null ? `만 ${age}세` : '';
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-4 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <p className="font-semibold text-gray-900">아동 선택</p>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-4 pt-4">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="input-field pl-9"
+              placeholder="이름, 보호자명, 연락처 검색"
+            />
+          </div>
+        </div>
+
+        <div className="max-h-72 overflow-y-auto px-4 py-3 space-y-2">
+          {/* 선택 해제 옵션 */}
+          <button
+            type="button"
+            onClick={() => { onSelect(''); onClose(); }}
+            className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${
+              !selectedId
+                ? 'border-primary-300 bg-primary-50 text-primary-700 font-medium'
+                : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            직접 입력 (아동 선택 안 함)
+          </button>
+
+          {filtered.length === 0 && (
+            <p className="py-4 text-center text-sm text-gray-400">
+              {query ? '검색 결과가 없습니다.' : '등록된 아동이 없습니다.'}
+            </p>
+          )}
+
+          {filtered.map((client) => (
+            <button
+              key={client.id}
+              type="button"
+              onClick={() => { onSelect(client.id); onClose(); }}
+              className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                selectedId === client.id
+                  ? 'border-primary-300 bg-primary-50'
+                  : 'border-gray-200 hover:border-primary-200 hover:bg-primary-50/30'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
+                  <UserRound size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-gray-900">{client.name}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {[
+                      ageLabel(client.birthDate),
+                      client.gender,
+                      client.guardian ? `보호자 ${client.guardian}` : '',
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+                {selectedId === client.id && (
+                  <span className="shrink-0 rounded-full bg-primary-600 px-2 py-0.5 text-xs text-white">선택됨</span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="border-t border-gray-100 px-4 py-3">
+          <button
+            type="button"
+            onClick={onAddNew}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 py-2.5 text-sm text-gray-500 transition-colors hover:border-primary-300 hover:text-primary-700"
+          >
+            <PlusCircle size={14} />
+            새 아동 등록하러 가기
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -941,6 +1066,7 @@ export default function JournalForm() {
   const [recentTypes, setRecentTypes] = useState(getRecentJournalTypes());
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState('');
+  const [showClientPicker, setShowClientPicker] = useState(false);
 
   async function handlePdfDownload() {
     setPdfLoading(true);
@@ -1071,12 +1197,24 @@ export default function JournalForm() {
 
   function handleClientChange(clientId) {
     const client = clients.find((item) => item.id === clientId);
+    const age = client ? calcAgeFromBirth(client.birthDate) : null;
+    const ageText = age !== null ? `${age}세` : '';
+
     updateForm((prev) => ({
       ...prev,
       clientId,
+      // 아동명 자동 채움
       childName: client?.name || prev.childName,
-      birthDate: prev.type === JOURNAL_TYPES.INITIAL_CONSULTATION ? (prev.birthDate || client?.birthDate || '') : prev.birthDate,
-      gender: prev.type === JOURNAL_TYPES.INITIAL_CONSULTATION ? (prev.gender || client?.gender || '') : prev.gender,
+      // 나이 자동 채움 (생년월일 기반 계산)
+      childAge: client?.birthDate ? (ageText || prev.childAge) : prev.childAge,
+      // 성별 자동 채움
+      gender: client?.gender ? client.gender : prev.gender,
+      // 생년월일 자동 채움
+      birthDate: client?.birthDate ? client.birthDate : prev.birthDate,
+      // 면담일지: 보호자명 자동 채움
+      intervieweeName: (prev.type === JOURNAL_TYPES.INTERVIEW_LOG && client?.guardian)
+        ? (prev.intervieweeName || client.guardian)
+        : prev.intervieweeName,
     }));
   }
 
@@ -1255,12 +1393,32 @@ export default function JournalForm() {
         <SectionCard title="문서 기본 정보">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <LabeledField label="아동 선택">
-              <select value={form.clientId} onChange={(e) => handleClientChange(e.target.value)} className="input-field">
-                <option value="">직접 입력 (아동명은 양식에 입력)</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <button
+                type="button"
+                onClick={() => setShowClientPicker(true)}
+                className="input-field flex w-full items-center justify-between gap-2 text-left"
+              >
+                {form.clientId ? (
+                  <span className="flex items-center gap-2 min-w-0">
+                    <UserRound size={14} className="shrink-0 text-primary-600" />
+                    <span className="truncate font-medium text-gray-900">
+                      {clients.find((c) => c.id === form.clientId)?.name || '알 수 없음'}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-gray-400">아동 선택 또는 직접 입력</span>
+                )}
+                <ChevronDown size={14} className="shrink-0 text-gray-400" />
+              </button>
+              {form.clientId && (
+                <button
+                  type="button"
+                  onClick={() => handleClientChange('')}
+                  className="mt-1 flex items-center gap-1 text-xs text-gray-400 hover:text-red-500"
+                >
+                  <X size={11} /> 선택 해제
+                </button>
+              )}
             </LabeledField>
             <LabeledField label="저장 상태">
               <StatusPills value={form.status} onChange={(v) => setField('status', v)} />
@@ -1345,6 +1503,16 @@ export default function JournalForm() {
           </button>
         </div>
       </form>
+
+      {showClientPicker && (
+        <ClientPickerModal
+          clients={clients}
+          selectedId={form.clientId}
+          onSelect={handleClientChange}
+          onClose={() => setShowClientPicker(false)}
+          onAddNew={() => { setShowClientPicker(false); navigate('/clients'); }}
+        />
+      )}
 
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
