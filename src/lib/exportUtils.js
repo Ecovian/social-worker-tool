@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
@@ -15,396 +14,347 @@ import {
   WidthType,
 } from 'docx';
 import { format } from 'date-fns';
-import { getPhotoDataUrl } from './photoStore';
 import { JOURNAL_TYPES, journalTypeLabel } from './storage';
 
-// ── 폰트 로딩 ─────────────────────────────────────────────────────────────────
-let fontBase64 = null;
-let currentFont = 'Helvetica'; // 폰트 로드 실패시 기본값
+// ── HTML → PDF 변환 (html2canvas 사용 → 한글 완벽 지원) ──────────────────────
 
-async function loadKoreanFont() {
-  if (fontBase64) return fontBase64;
-  const base = import.meta.env.BASE_URL || '/';
-  const url = `${base.replace(/\/$/, '')}/fonts/NanumGothic.ttf`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`폰트 로드 실패: ${response.status} (${url})`);
-  const buffer = await response.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
-  fontBase64 = btoa(binary);
-  return fontBase64;
+function esc(v) {
+  return String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
 }
 
-async function createPdf() {
-  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-  currentFont = 'Helvetica';
-  try {
-    const font = await loadKoreanFont();
-    doc.addFileToVFS('NanumGothic.ttf', font);
-    doc.addFont('NanumGothic.ttf', 'NanumGothic', 'normal');
-    doc.setFont('NanumGothic', 'normal');
-    currentFont = 'NanumGothic';
-  } catch (e) {
-    console.warn('[PDF] 한글 폰트 로드 실패, 기본 폰트 사용:', e.message);
-    doc.setFont('Helvetica', 'normal');
-  }
-  return doc;
+function chk(opts, sel) {
+  return opts.map((o) => `${sel === o ? '■' : '□'}&nbsp;${esc(o)}`).join('&emsp;');
 }
 
-function f() { return currentFont; } // 현재 폰트 반환 헬퍼
+// 인라인 스타일 상수
+const LS = 'background:#d8d8d8;border:1px solid #666;padding:6px 5px;text-align:center;vertical-align:middle;font-weight:600;white-space:pre-line;line-height:1.5;font-size:10px;';
+const CS = 'background:#fff;border:1px solid #666;padding:6px;text-align:left;vertical-align:top;font-size:10.5px;line-height:1.6;';
+const HS = 'background:#2a2a2a;color:#fff;border:1px solid #666;padding:6px;text-align:center;font-weight:600;font-size:10px;';
 
-// ── 공통 헬퍼 ─────────────────────────────────────────────────────────────────
-
-const S = {
-  lbl: { fillColor: [220, 220, 220], halign: 'center', valign: 'middle', fontSize: 8, cellPadding: 2 },
-  ctn: { fillColor: [255, 255, 255], halign: 'left', valign: 'top', fontSize: 9, cellPadding: 2 },
-  hdr: { fillColor: [50, 50, 50], textColor: [255, 255, 255], halign: 'center', valign: 'middle', fontSize: 8, cellPadding: 2 },
-};
-
-function L(text, extra = {}) { return { content: String(text ?? ''), styles: { ...S.lbl, font: f(), ...extra } }; }
-function C(text = '', extra = {}) { return { content: String(text ?? ''), styles: { ...S.ctn, font: f(), ...extra } }; }
-function CW(text = '', span = 1, extra = {}) { return { content: String(text ?? ''), colSpan: span, styles: { ...S.ctn, font: f(), ...extra } }; }
-function LW(text, span = 1, extra = {}) { return { content: String(text ?? ''), colSpan: span, styles: { ...S.lbl, font: f(), ...extra } }; }
-function H(text, span = 1, extra = {}) { return { content: String(text ?? ''), colSpan: span, styles: { ...S.hdr, font: f(), ...extra } }; }
-
-function chk(options, selected) {
-  return options.map(o => `${selected === o ? '■' : '□'} ${o}`).join('   ');
+// 페이지 래퍼 (760px = A4 콘텐츠 영역)
+function PAGE(body) {
+  return `<div style="font-family:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:10.5px;color:#000;background:#fff;padding:22px 24px;width:760px;box-sizing:border-box;">${body}</div>`;
 }
 
-function drawTable(doc, startY, body, head, foot, colStyles) {
-  const fn = f();
-  autoTable(doc, {
-    startY,
-    head: head || undefined,
-    body,
-    foot: foot || undefined,
-    styles: {
-      font: fn,
-      fontSize: 9,
-      lineColor: [100, 100, 100],
-      lineWidth: 0.3,
-      overflow: 'linebreak',
-      minCellHeight: 8,
-    },
-    headStyles: { font: fn },
-    footStyles: { font: fn, fillColor: [220, 220, 220] },
-    theme: 'grid',
-    margin: { left: 10, right: 10 },
-    columnStyles: colStyles || {},
-  });
-  return doc.lastAutoTable.finalY;
+function TITLE(t1, t2 = '') {
+  return `<div style="text-align:center;margin-bottom:8px;"><div style="font-size:15px;font-weight:700;">${t1}</div>${t2 ? `<div style="font-size:11px;color:#333;margin-top:2px;">${t2}</div>` : ''}</div>`;
 }
 
-function drawTitle(doc, t1, t2) {
-  let y = 14;
-  doc.setFont(f(), 'normal');
-  doc.setFontSize(14);
-  doc.text(t1, 105, y, { align: 'center' });
-  if (t2) { y += 7; doc.setFontSize(10); doc.text(t2, 105, y, { align: 'center' }); }
-  return y + 5;
+function TABLE(rows, mb = '6px') {
+  return `<table style="width:100%;border-collapse:collapse;margin-bottom:${mb};">${rows}</table>`;
 }
 
-function drawFooter(doc, text, y) {
-  if (y > 283) { doc.addPage(); y = 15; }
-  doc.setFont(f(), 'normal');
-  doc.setFontSize(9);
-  doc.text(text, 10, y);
-}
-
-function v(val) { return String(val ?? ''); }
+function L(text, w = '') { return `<td style="${LS}${w ? `width:${w};` : ''}">${text}</td>`; }
+function C(text, cs = 1, minH = '') { return `<td colspan="${cs}" style="${CS}${minH ? `min-height:${minH};` : ''}">${esc(text)}</td>`; }
+function CH(html, cs = 1, minH = '') { return `<td colspan="${cs}" style="${CS}${minH ? `min-height:${minH};` : ''}">${html}</td>`; }
+function H(text, cs = 1) { return `<td colspan="${cs}" style="${HS}">${text}</td>`; }
+function R(...cells) { return `<tr>${cells.join('')}</tr>`; }
 
 // ── 1. 활동일지 ───────────────────────────────────────────────────────────────
+function htmlActivityLog(j) {
+  const kindHtml = chk(['개별활동', '소그룹활동'], j.activityKind);
+  const detailText = [
+    j.detailedActivities,
+    j.playProcess ? `\n[놀이과정]\n${j.playProcess}` : '',
+    j.content ? `\n[관찰내용]\n${j.content}` : '',
+    j.conversationNotes ? `\n[이야기 나눈 내용]\n${j.conversationNotes}` : '',
+  ].filter(Boolean).join('');
 
-function renderActivityLog(doc, j) {
-  let y = drawTitle(doc, '[서식9] 놀세이버 활동일지', '놀세이버 활동일지(개별활동 / 소그룹활동)');
-
-  doc.setFont(f(), 'normal');
-  doc.setFontSize(8);
-  doc.text(
-    `회차 / 누적 시간        ${v(j.sessionNumber)} 회 /  ${v(j.cumulativeHours)} 시간`,
-    10, y,
-  );
-  y += 4;
-
-  const COL5 = { 0: { cellWidth: 25 }, 1: { cellWidth: 38 }, 2: { cellWidth: 31 }, 3: { cellWidth: 23 }, 4: { cellWidth: 73 } };
-
-  const kindText = chk(['개별활동', '소그룹활동'], v(j.activityKind));
-
-  y = drawTable(doc, y, [
-    [L('놀세이버명\n(소그룹 구성원)'), CW(j.saverName, 2), L('활동 일시'), C(`${v(j.date)}  ${v(j.time)}`)],
-    [L('아동명\n(소그룹 구성원)'), CW(j.childName, 2), L('아동연령'), C(j.childAge)],
-    [L('활동계획안 NO.'), CW(j.activityPlanNo, 2), L('활동구분'), C(kindText)],
-    [L('활동장소'), CW(j.activityPlace, 2), L('만족도'), C(j.satisfaction)],
-    [L('활동 주제'), CW(j.activitySubject, 4)],
-    [L('놀잇감/사용 교구'), CW(j.playMaterials, 4)],
-  ], null, null, COL5);
-
-  const detail = [
-    v(j.detailedActivities),
-    j.playProcess ? `\n\n[놀이과정]\n${v(j.playProcess)}` : '',
-    j.content ? `\n\n[관찰내용]\n${v(j.content)}` : '',
-    j.conversationNotes ? `\n\n[이야기 나눈 내용]\n${v(j.conversationNotes)}` : '',
-  ].join('');
-
-  y = drawTable(doc, y, [
-    [
-      L('세부\n활동\n내용'),
-      L('놀이과정\n*관찰내용\n*놀세이버와\n또래아동이\n야기 나눈\n내용 등', { halign: 'left', fontSize: 7 }),
-      C(detail, { minCellHeight: 75 }),
-    ],
-  ], null, null, { 0: { cellWidth: 25 }, 1: { cellWidth: 45 }, 2: { cellWidth: 120 } });
-
-  if (y > 220) { doc.addPage(); y = 15; }
-
-  y = drawTable(doc, y, [
-    [
-      L('놀세이버 의견\n(아동의 변화,\n보호자 면담 내용\n등)'),
-      C(`※ 활동 평가 및 의견. 부모와 상담 또는 부모 의견 등 작성\n\n${v(j.saverOpinion) || v(j.activityEvaluation)}`, { minCellHeight: 50 }),
-    ],
-    [
-      L('활동 사진'),
-      C(`※ 1~2 장면 (사진 원본 별도 보관 필요)\n\n첨부 사진: ${j.photos?.length || 0}장`, { minCellHeight: 40 }),
-    ],
-  ], null, null, { 0: { cellWidth: 45 }, 1: { cellWidth: 145 } });
-
-  drawFooter(doc, `협력기관 담당자 확인:                     (명)`, y + 5);
+  return PAGE(`
+    ${TITLE('[서식9] 놀세이버 활동일지', '놀세이버 활동일지(개별활동 / 소그룹활동)')}
+    <div style="font-size:10px;margin-bottom:5px;">회차 / 누적 시간 &nbsp;&nbsp;&nbsp;&nbsp; <b>${esc(j.sessionNumber)}</b> 회 / <b>${esc(j.cumulativeHours)}</b> 시간</div>
+    ${TABLE(`
+      ${R(L('놀세이버명<br>(소그룹 구성원)', '15%'), C(j.saverName, 2, ''), L('활동 일시', '13%'), C(`${j.date || ''} ${j.time || ''}`))}
+      ${R(L('아동명<br>(소그룹 구성원)'), C(j.childName, 2), L('아동연령'), C(j.childAge))}
+      ${R(L('활동계획안 NO.'), C(j.activityPlanNo, 2), L('활동구분'), CH(kindHtml))}
+      ${R(L('활동장소'), C(j.activityPlace, 2), L('만족도'), C(j.satisfaction))}
+      ${R(L('활동 주제'), C(j.activitySubject, 4))}
+      ${R(L('놀잇감/사용 교구'), C(j.playMaterials, 4))}
+      <tr>
+        ${L('세부<br>활동<br>내용')}
+        <td style="${LS}width:13%;font-size:9px;text-align:left;">놀이과정<br>*관찰내용<br>*놀세이버와<br>또래아동이<br>나눈 내용 등</td>
+        <td colspan="3" style="${CS}min-height:120px;">${esc(detailText)}</td>
+      </tr>
+    `)}
+    ${TABLE(`
+      ${R(L('놀세이버 의견<br>(아동의 변화,<br>보호자 면담<br>내용 등)', '20%'), C(`${j.saverOpinion || j.activityEvaluation || ''}`, 1, '80px'))}
+      ${R(L('활동 사진'), `<td style="${CS}min-height:60px;color:#999;font-size:9px;">※ 1~2 장면 (사진 원본 별도 보관 필요) — 첨부 사진: ${j.photos?.length || 0}장</td>`)}
+    `)}
+    <div style="margin-top:6px;font-size:10px;">협력기관 담당자 확인:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(명)</div>
+  `);
 }
 
 // ── 2. 면담일지 ───────────────────────────────────────────────────────────────
+function htmlInterviewLog(j) {
+  const methods = ['전화', '내소(센터)', '가정방문', '기타'];
+  const providers = ['가족', '기관종사자', '기타'];
+  const methodHtml = chk(methods, j.consultationMethod);
+  const provHtml = chk(providers, j.infoProvider);
 
-function renderInterviewLog(doc, j) {
-  const y0 = drawTitle(doc, '면담/상담 일지');
-
-  const methodMap = { '전화': '➀', '내소(센터)': '➁', '가정방문': '➂', '기타': '➃' };
-  const sel = v(j.consultationMethod);
-  const methodText = `➀전화 ➁ 내소(센터) ➂가정방문\n➃ 기타(${sel === '기타' ? v(j.infoProviderDetail) : ''})\n▶ 선택: ${methodMap[sel] || ''}${sel}`;
-
-  const provMap = { '가족': '①', '기관종사자': '➁', '기타': '➂' };
-  const prov = v(j.infoProvider);
-  const provText = `①가족 ( )  ➁기관종사자\n➂기타(${prov === '기타' ? v(j.infoProviderDetail) : ''})\n▶ 선택: ${provMap[prov] || ''}${prov}`;
-
-  const contentText = [
+  const contentLines = [
     '1) 아동의 놀이활동 내용 및 놀이관련 정보 제공',
     '2) 아동의 변화 및 아동의 놀이 특성',
     '3) 아동에 대한 특성, 특이 사항 등 공유',
     '4) 자문위원의 슈퍼비젼과 향후 계획 공유',
-    '5) 아동 및 보호자의 욕구 파악-이후 놀이 활동 계획 등',
+    '5) 아동 및 보호자의 욕구 파악 - 이후 놀이 활동 계획 등',
     '',
-    v(j.consultationContent),
+    j.consultationContent || '',
   ].join('\n');
 
-  const COL4 = { 0: { cellWidth: 40 }, 1: { cellWidth: 55 }, 2: { cellWidth: 38 }, 3: { cellWidth: 57 } };
-
-  const finalY = drawTable(doc, y0, [
-    [L('놀세이버명'), C(j.saverName), L('상담일자'), C(j.consultationDate || j.date)],
-    [L('아동명'), C(j.childName), L('면담자\n(보호자명)'), C(j.intervieweeName)],
-    [L('상담 수행\n방법 구분'), C(methodText), L('상담정보\n제공자'), C(provText)],
-    [L('상담(면담)\n내용'), CW(contentText, 3, { minCellHeight: 70 })],
-    [L('향후 개입 계획\n및 보호자\n상담 결과'), CW(j.futurePlan, 3, { minCellHeight: 35 })],
-  ], null, null, COL4);
-
-  drawFooter(doc, `협력기관 담당자 확인:                     (명)`, finalY + 5);
+  return PAGE(`
+    ${TITLE('면담/상담 일지')}
+    ${TABLE(`
+      ${R(L('놀세이버명', '18%'), C(j.saverName, 1, ''), L('상담일자', '15%'), C(j.consultationDate || j.date))}
+      ${R(L('아동명'), C(j.childName), L('면담자<br>(보호자명)'), C(j.intervieweeName))}
+      ${R(L('상담 수행<br>방법 구분'), CH(methodHtml, 1, ''), L('상담정보<br>제공자'), CH(provHtml))}
+      ${R(L('상담(면담)<br>내용'), C(contentLines, 3, '110px'))}
+      ${R(L('향후 개입 계획<br>및 보호자<br>상담 결과'), C(j.futurePlan, 3, '60px'))}
+    `)}
+    <div style="margin-top:6px;font-size:10px;">협력기관 담당자 확인:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(명)</div>
+  `);
 }
 
 // ── 3. 초기상담기록지 ─────────────────────────────────────────────────────────
+function htmlInitialConsultation(j) {
+  const soloOpts = ['1시간 미만', '1시간 이상~2시간 미만', '2시간 이상~3시간 미만', '3시간 이상~4시간 미만', '4시간 이상'];
+  const lvOpts = ['매우 많다', '조금 많다', '보통이다', '부족하다', '매우 부족하다'];
 
-function renderInitialConsultation(doc, j) {
-  let y = drawTitle(doc, '[서식7] 초기상담 기록지', '초기상담 기록지');
+  const soloHtml = chk(soloOpts, j.soloPlayTimeRange);
+  const toyTypeHtml = chk(lvOpts, j.toyTypeLevel);
+  const toyQtyHtml = chk(lvOpts, j.toyQuantityLevel);
 
-  const COL6 = { 0: { cellWidth: 32 }, 1: { cellWidth: 28 }, 2: { cellWidth: 30 }, 3: { cellWidth: 28 }, 4: { cellWidth: 22 }, 5: { cellWidth: 50 } };
-  y = drawTable(doc, y, [
-    [L('아동명'), CW(j.childName, 2), L('생년월일\n(연령)'), CW(j.birthDate, 1), L('성별'), C(j.gender)],
-    [L('장애 유형\n장애 정도'), CW(`${v(j.disabilityType)} / ${v(j.disabilityLevel)}`, 2), L('비상연락처'), CW(j.emergencyContact, 3)],
-    [L('아동 질병/질환\n(건강상\n특이사항)'), CW(j.healthNotes, 5, { minCellHeight: 14 })],
-  ], null, null, COL6);
-
-  const famData = (j.familyRows || []).length > 0
-    ? j.familyRows.map(r => [v(r.relation), v(r.name), v(r.age), v(r.disability), v(r.notes)])
-    : [['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', '']];
-
-  y = drawTable(doc, y, famData,
-    [[H('가족관계', 5)], ['관계', '이름', '연령', '장애유무', '특이사항 (질병, 동거 여부 등)']],
-    null,
-    { 0: { cellWidth: 25 }, 1: { cellWidth: 28 }, 2: { cellWidth: 18 }, 3: { cellWidth: 28 }, 4: { cellWidth: 91 } });
-
-  const SOLO_OPTS = ['1시간 미만', '1시간 이상~2시간 미만', '2시간 이상~3시간 미만', '3시간 이상~4시간 미만', '4시간 이상'];
-  const LV_OPTS = ['매우 많다', '조금 많다', '보통이다', '부족하다', '매우 부족하다'];
-
-  const soloText = SOLO_OPTS.map(o => `${j.soloPlayTimeRange === o ? '■' : '□'} ${o}`).join('  ');
-  const toyTypeText = LV_OPTS.map(o => `${j.toyTypeLevel === o ? '■' : '□'} ${o}`).join('  ');
-  const toyQtyText = LV_OPTS.map(o => `${j.toyQuantityLevel === o ? '■' : '□'} ${o}`).join('  ');
-
-  const leisureContent = [
-    `1) 가정이나 지역사회에서 즐겨하는 활동은?\n${v(j.leisureActivity)}`,
-    `\n2) 자주가는 곳(공간)은?\n${v(j.frequentPlace)}`,
-    `\n3) 아동이 혼자 노는 시간은 얼마나 되나요?\n${soloText}`,
-    `\n4) 아동이 갖고 노는 장난감의 종류와 양은?\n  종류(다양성): ${toyTypeText}\n  양(갯수): ${toyQtyText}`,
+  const leisureText = [
+    `1) 가정이나 지역사회에서 즐겨하는 활동은?\n${j.leisureActivity || ''}`,
+    `\n2) 자주가는 곳(공간)은?\n${j.frequentPlace || ''}`,
   ].join('');
+  const leisureHtml2 = `<br>3) 아동이 혼자 노는 시간은? &nbsp;${soloHtml}<br>4) 장난감 종류(다양성): &nbsp;${toyTypeHtml}<br>&nbsp;&nbsp;&nbsp;장난감 양(갯수): &nbsp;${toyQtyHtml}`;
 
-  y = drawTable(doc, y, [
-    [L('여가 시간'), C(leisureContent, { minCellHeight: 55 })],
-  ], null, null, { 0: { cellWidth: 25 }, 1: { cellWidth: 165 } });
+  const famRows = (j.familyRows || []).length > 0
+    ? j.familyRows.map((r) => `<tr>${['relation','name','age','disability','notes'].map((k) => `<td style="${CS}padding:4px;">${esc(r[k] || '')}</td>`).join('')}</tr>`).join('')
+    : `<tr>${Array(5).fill(`<td style="${CS}height:24px;"></td>`).join('')}</tr>`.repeat(3);
 
-  doc.addPage();
-  y = 12;
+  const page1 = PAGE(`
+    ${TITLE('[서식7] 초기상담 기록지', '초기상담 기록지')}
+    ${TABLE(`
+      ${R(L('아동명', '15%'), C(j.childName, 2, ''), L('생년월일<br>(연령)', '13%'), C(j.birthDate), L('성별', '8%'), C(j.gender))}
+      ${R(L('장애 유형<br>장애 정도'), C(`${j.disabilityType || ''}`, 1), C(`${j.disabilityLevel || ''}`, 1), L('비상연락처'), C(j.emergencyContact, 3))}
+      ${R(L('아동 질병/질환<br>(건강상 특이사항)'), C(j.healthNotes, 5, '40px'))}
+    `)}
+    ${TABLE(`
+      <tr>${H('가족관계', 5)}</tr>
+      <tr>${['관계','이름','연령','장애유무','특이사항 (질병, 동거 여부 등)'].map((h) => `<th style="${LS}">${h}</th>`).join('')}</tr>
+      ${famRows}
+    `)}
+    ${TABLE(`
+      <tr>
+        ${L('여가 시간', '18%')}
+        <td style="${CS}">
+          ${esc(leisureText)}
+          ${leisureHtml2}
+        </td>
+      </tr>
+    `)}
+  `);
 
-  y = drawTable(doc, y, [
-    [L('또래관계'), C(`1) 친구와 주로 하는 활동은?\n${v(j.peerActivities)}\n\n2) 또래 관계에 대해 알고 있어야 할 부분은?\n${v(j.peerNotes)}`, { minCellHeight: 28 })],
-    [L('진로'), C(`1) 아동의 꿈은?\n${v(j.dream)}\n\n2) 아동의 특기는?\n${v(j.strengths)}`, { minCellHeight: 22 })],
-    [L('욕구'), C(`1) 아동이 가장 즐겨 하는 것은 무엇입니까?\n${v(j.favoriteThings)}\n\n2) 이 서비스를 통해 얻고 싶은 것은?\n${v(j.serviceGoals)}`, { minCellHeight: 28 })],
-    [L('아동에 대해\n주의 해야\n하는 점'), C(`1) 문제행동이나 자극이 되는 부분\n${v(j.cautionBehavior)}\n\n2) 질병과 알레르기\n${v(j.cautionHealth)}\n\n3) 돌발행동 대처 Tip\n${v(j.cautionTips)}`, { minCellHeight: 35 })],
-    [L('외부 놀이에\n대한 욕구'), C(`1) 외부 놀이를 희망하시나요?\n${v(j.outdoorPlayWish)}\n\n2) 외부 놀이 시 주의해야 할 점은?\n${v(j.outdoorPlayNotes)}`, { minCellHeight: 25 })],
-  ], null, null, { 0: { cellWidth: 32 }, 1: { cellWidth: 158 } });
+  const page2 = PAGE(`
+    ${TITLE('[서식7] 초기상담 기록지 (계속)')}
+    ${TABLE(`
+      ${R(L('또래관계', '18%'), C(`1) 친구와 주로 하는 활동은?\n${j.peerActivities || ''}\n\n2) 또래 관계에 대해 알고 있어야 할 부분은?\n${j.peerNotes || ''}`, 1, '70px'))}
+      ${R(L('진로'), C(`1) 아동의 꿈은?\n${j.dream || ''}\n\n2) 아동의 특기는?\n${j.strengths || ''}`, 1, '55px'))}
+      ${R(L('욕구'), C(`1) 아동이 가장 즐겨 하는 것은 무엇입니까?\n${j.favoriteThings || ''}\n\n2) 이 서비스를 통해 얻고 싶은 것은?\n${j.serviceGoals || ''}`, 1, '65px'))}
+      ${R(L('아동에 대해<br>주의해야<br>하는 점'), C(`1) 문제행동이나 자극이 되는 부분\n${j.cautionBehavior || ''}\n\n2) 질병과 알레르기\n${j.cautionHealth || ''}\n\n3) 돌발행동 대처 Tip\n${j.cautionTips || ''}`, 1, '80px'))}
+      ${R(L('외부 놀이에<br>대한 욕구'), C(`1) 외부(가정 밖) 놀이를 희망하시나요?\n${j.outdoorPlayWish || ''}\n\n2) 외부 놀이 시 주의해야 할 점은?\n${j.outdoorPlayNotes || ''}`, 1, '60px'))}
+    `)}
+  `);
 
-  doc.addPage();
-  drawTable(doc, 15, [
-    [L('아동 사진 (각 구분별로 최소 2장 이상 첨부)', { halign: 'left' }), C('')],
-    [L('아동 사진\n(전신 포함)'), C('', { minCellHeight: 55 })],
-    [L('가정 내\n아동 놀이공간'), C('', { minCellHeight: 55 })],
-    [L('아동 놀잇감'), C('', { minCellHeight: 55 })],
-    [L('아동의\n놀이 상황'), C('', { minCellHeight: 55 })],
-  ], null, null, { 0: { cellWidth: 50 }, 1: { cellWidth: 140 } });
+  const page3 = PAGE(`
+    ${TITLE('[서식7] 초기상담 기록지 — 아동 사진')}
+    <div style="font-size:10px;margin-bottom:6px;">아동 사진 (각 구분별로 최소 2장 이상 첨부)</div>
+    ${TABLE(`
+      ${R(L('아동 사진<br>(전신 포함)', '22%'), `<td style="${CS}min-height:120px;color:#999;font-size:9px;">사진 첨부 공간</td>`)}
+      ${R(L('가정 내<br>아동 놀이공간'), `<td style="${CS}min-height:100px;color:#999;font-size:9px;">사진 첨부 공간</td>`)}
+      ${R(L('아동 놀잇감'), `<td style="${CS}min-height:100px;color:#999;font-size:9px;">사진 첨부 공간</td>`)}
+      ${R(L('아동의<br>놀이 상황'), `<td style="${CS}min-height:100px;color:#999;font-size:9px;">사진 첨부 공간</td>`)}
+    `)}
+  `);
+
+  return [page1, page2, page3];
 }
 
 // ── 4. 놀이계획서(소그룹) ──────────────────────────────────────────────────────
-
-function renderGroupPlayPlan(doc, j) {
-  let y = drawTitle(doc, '[서식8] 놀이계획서', '놀이계획서-소그룹');
-
-  doc.setFont(f(), 'normal');
-  doc.setFontSize(9);
-  doc.text(
-    `작성일 : ${v(j.writerDate) || v(j.date) || '      년       월       일'}        작성자 : ${v(j.writerName) || v(j.saverName)}`,
-    10, y,
-  );
-  y += 5;
-
-  const COL6 = { 0: { cellWidth: 35 }, 1: { cellWidth: 30 }, 2: { cellWidth: 38 }, 3: { cellWidth: 28 }, 4: { cellWidth: 28 }, 5: { cellWidth: 31 } };
-
-  y = drawTable(doc, y, [
-    [L('활동일시'), CW(v(j.date), 1), L('월    일    요일\n활동 시간 :'), C(v(j.time)), L('장소'), C(v(j.location) || v(j.activityPlace))],
-    [L('참여 놀세이버\n이름'), CW(v(j.participantSaverNames) || v(j.saverName), 5)],
-    [L('참여\n아동이름(연령)'), CW(v(j.participantChildrenSummary), 5)],
-  ], null, null, COL6);
-
+function htmlGroupPlayPlan(j) {
   const peerRows = (j.peerLevelRows || []).length > 0
-    ? j.peerLevelRows.map(r => [v(r.childName), `${v(r.playLevel)}\n${v(r.notes)}`])
-    : [['', ''], ['', ''], ['', '']];
+    ? j.peerLevelRows.map((r) => `<tr><td style="${CS}padding:4px;">${esc(r.childName)}</td><td style="${CS}padding:4px;">${esc(r.playLevel)}${r.notes ? '<br>' + esc(r.notes) : ''}</td></tr>`).join('')
+    : Array(3).fill(`<tr><td style="${CS}height:24px;"></td><td style="${CS}"></td></tr>`).join('');
 
-  y = drawTable(doc, y, peerRows,
-    [[H('아동별 또래와의 놀이활동 수준', 2)], ['아동명', '또래와의 놀이활동 수준 및 특성']],
-    null,
-    { 0: { cellWidth: 50 }, 1: { cellWidth: 140 } });
-
-  y = drawTable(doc, y, [
-    [L('소그룹 매칭\n특성 및\n활동 목표'), C(`※ 소그룹 놀이 관련 목표 계획에 따른 활동 작성, 상세하게 작성\n\n${v(j.matchingGoal)}`, { minCellHeight: 32 })],
-    [L('놀이 활동 계획\n활동 계획'), C(v(j.groupPlan), { minCellHeight: 30 })],
-    [L('구매 필요한 물품\n(협력기관에 협조\n요청 사항)'), C(v(j.neededMaterials), { minCellHeight: 20 })],
-    [L('비고'), C(v(j.note), { minCellHeight: 12 })],
-  ], null, null, { 0: { cellWidth: 42 }, 1: { cellWidth: 148 } });
-
-  drawFooter(doc, `협력기관 담당자 확인:                     (명)`, y + 5);
+  return PAGE(`
+    ${TITLE('[서식8] 놀이계획서', '놀이계획서 - 소그룹')}
+    <div style="font-size:10px;margin-bottom:6px;">작성일: ${esc(j.writerDate || j.date || '')}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;작성자: ${esc(j.writerName || j.saverName || '')}</div>
+    ${TABLE(`
+      ${R(L('활동일시', '18%'), C(j.date, 1, ''), L('월&nbsp;일&nbsp;요일<br>활동 시간:', '20%'), C(j.time), L('장소', '10%'), C(j.location || j.activityPlace))}
+      ${R(L('참여 놀세이버<br>이름'), C(j.participantSaverNames || j.saverName, 5))}
+      ${R(L('참여<br>아동이름(연령)'), C(j.participantChildrenSummary, 5))}
+    `)}
+    ${TABLE(`
+      <tr>${H('아동별 또래와의 놀이활동 수준', 2)}</tr>
+      <tr><th style="${LS}width:30%;">아동명</th><th style="${LS}">또래와의 놀이활동 수준 및 특성</th></tr>
+      ${peerRows}
+    `)}
+    ${TABLE(`
+      ${R(L('소그룹 매칭<br>특성 및<br>활동 목표', '22%'), C(`※ 소그룹 놀이 관련 목표 계획에 따른 활동 작성, 상세하게 작성\n\n${j.matchingGoal || ''}`, 1, '80px'))}
+      ${R(L('놀이 활동 계획<br>활동 계획'), C(j.groupPlan, 1, '70px'))}
+      ${R(L('구매 필요한 물품<br>(협력기관에<br>협조 요청 사항)'), C(j.neededMaterials, 1, '50px'))}
+      ${R(L('비고'), C(j.note, 1, '28px'))}
+    `)}
+    <div style="margin-top:6px;font-size:10px;">협력기관 담당자 확인:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(명)</div>
+  `);
 }
 
 // ── 5. 놀이계획서(개별) ────────────────────────────────────────────────────────
-
-function renderIndividualPlayPlan(doc, j) {
+function htmlIndividualPlayPlan(j) {
   const isFirst = j.planPeriod !== '하반기';
   const periodLabel = isFirst ? '상반기' : '하반기';
   const months = isFirst
     ? ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월']
     : ['9월', '10월', '11월', '12월'];
 
-  let y = drawTitle(doc, '[서식8] 놀이계획서', `놀이계획서-개별 (${periodLabel})`);
-
-  const HCOL = { 0: { cellWidth: 30 }, 1: { cellWidth: 44 }, 2: { cellWidth: 16 }, 3: { cellWidth: 25 }, 4: { cellWidth: 75 } };
-
-  const periodDateText = v(j.activityStartDate) && v(j.activityEndDate)
-    ? `${j.activityStartDate} ~ ${j.activityEndDate}\n( ${v(j.weeklyCountText) || '     주간/      회'} )`
-    : '       월      일  ~       월      일\n(         주간/          회)';
-
-  const timeText = v(j.activityTimeText) || '매주       요일\n      시      분  ~       시      분';
-
-  y = drawTable(doc, y, [
-    [L('놀세이버명'), C(v(j.saverName) || v(j.writerName)), L('(인)'), L('계획\n일시'), C(v(j.date) || v(j.writerDate) || '      월      일      요일')],
-    [L('아동명'), CW(j.childName, 2), L('아동연령'), C(`${v(j.childAge)} 세 (${v(j.childGrade)} 학년)`)],
-    [L('활동 기간'), CW(periodDateText, 2), L('활동\n시간'), C(timeText)],
-    [L('현행 수준'), CW(j.currentLevel, 4, { minCellHeight: 22 })],
-    [L('놀이 목표'), CW(`※ 아동별 학습/놀이관련 목표 계획에 따른 활동 작성\n${v(j.playGoal)}`, 4, { minCellHeight: 22 })],
-  ], null, null, HCOL);
-
-  const MCOL = {
-    0: { cellWidth: 12 }, 1: { cellWidth: 13 }, 2: { cellWidth: 25 },
-    3: { cellWidth: 57 }, 4: { cellWidth: 27 }, 5: { cellWidth: 56 },
-  };
-
   const planMap = {};
-  (j.planRows || []).forEach(r => {
+  (j.planRows || []).forEach((r) => {
     if (!planMap[r.month]) planMap[r.month] = [];
     planMap[r.month].push(r);
   });
 
-  const monthRows = [];
-  months.forEach(month => {
+  const planRows = months.flatMap((month) => {
     const rows = planMap[month]?.length > 0 ? planMap[month] : [{}];
-    rows.forEach((r, idx) => {
-      monthRows.push([
-        idx === 0 ? month : '',
-        v(r.sessionCount),
-        v(r.playArea),
-        v(r.activityContent),
-        v(r.planNo),
-        v(r.placeMaterials),
-      ]);
-    });
-  });
+    return rows.map((r, idx) => `
+      <tr>
+        <td style="${CS}text-align:center;padding:4px;">${idx === 0 ? month : ''}</td>
+        <td style="${CS}text-align:center;padding:4px;">${esc(r.sessionCount)}</td>
+        <td style="${CS}padding:4px;">${esc(r.playArea)}</td>
+        <td style="${CS}padding:4px;">${esc(r.activityContent)}</td>
+        <td style="${CS}text-align:center;padding:4px;">${esc(r.planNo)}</td>
+        <td style="${CS}padding:4px;">${esc(r.placeMaterials)}</td>
+      </tr>`);
+  }).join('');
 
-  drawTable(doc, y, monthRows,
-    [
-      [H('월별 놀이 활동 계획', 6)],
-      ['회차', '회기수', '놀이\n영역', '활동 내용', '활동계획안\nNO.', '활동 장소 및\n구매 필요한 물품'],
-    ],
-    [['합계', { content: '총 회기수/놀이시간 작성', colSpan: 5 }]],
-    MCOL);
+  const periodDate = j.activityStartDate && j.activityEndDate
+    ? `${j.activityStartDate} ~ ${j.activityEndDate} (${j.weeklyCountText || ''})`
+    : '';
 
-  drawFooter(doc, `협력기관 담당자 확인:                     (명)`, doc.lastAutoTable.finalY + 5);
+  return PAGE(`
+    ${TITLE('[서식8] 놀이계획서', `놀이계획서 - 개별 (${periodLabel})`)}
+    ${TABLE(`
+      ${R(L('놀세이버명', '16%'), C(j.saverName || j.writerName), L('(인)', '8%'), L('계획<br>일시', '12%'), C(j.date || j.writerDate))}
+      ${R(L('아동명'), C(j.childName, 2), L('아동연령'), C(`${j.childAge || ''} 세 (${j.childGrade || ''} 학년)`))}
+      ${R(L('활동 기간'), C(periodDate, 2), L('활동<br>시간'), C(j.activityTimeText))}
+      ${R(L('현행 수준'), C(j.currentLevel, 4, '50px'))}
+      ${R(L('놀이 목표'), C(`※ 아동별 학습/놀이관련 목표 계획에 따른 활동 작성\n${j.playGoal || ''}`, 4, '50px'))}
+    `)}
+    ${TABLE(`
+      <tr>${H('월별 놀이 활동 계획', 6)}</tr>
+      <tr>
+        ${['회차', '회기수', '놀이 영역', '활동 내용', '활동계획안 NO.', '활동 장소 및<br>구매 필요한 물품'].map((h) => `<th style="${LS}">${h}</th>`).join('')}
+      </tr>
+      ${planRows}
+      <tr>
+        <td style="${LS}">합계</td>
+        <td colspan="5" style="${CS}color:#777;font-size:9px;">총 회기수/놀이시간 작성</td>
+      </tr>
+    `)}
+    <div style="margin-top:6px;font-size:10px;">협력기관 담당자 확인:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(명)</div>
+  `);
 }
 
-// ── 폼 디스패처 ───────────────────────────────────────────────────────────────
+// ── HTML → Canvas → PDF 변환기 ────────────────────────────────────────────────
 
-function renderForm(doc, journal) {
+function buildJournalPages(journal) {
   switch (journal.type) {
-    case JOURNAL_TYPES.ACTIVITY_LOG:         return renderActivityLog(doc, journal);
-    case JOURNAL_TYPES.INTERVIEW_LOG:        return renderInterviewLog(doc, journal);
-    case JOURNAL_TYPES.INITIAL_CONSULTATION: return renderInitialConsultation(doc, journal);
-    case JOURNAL_TYPES.PLAY_PLAN_GROUP:      return renderGroupPlayPlan(doc, journal);
-    case JOURNAL_TYPES.PLAY_PLAN_INDIVIDUAL: return renderIndividualPlayPlan(doc, journal);
-    default:                                 return renderActivityLog(doc, journal);
+    case JOURNAL_TYPES.ACTIVITY_LOG:         return [htmlActivityLog(journal)];
+    case JOURNAL_TYPES.INTERVIEW_LOG:        return [htmlInterviewLog(journal)];
+    case JOURNAL_TYPES.INITIAL_CONSULTATION: return htmlInitialConsultation(journal);
+    case JOURNAL_TYPES.PLAY_PLAN_GROUP:      return [htmlGroupPlayPlan(journal)];
+    case JOURNAL_TYPES.PLAY_PLAN_INDIVIDUAL: return [htmlIndividualPlayPlan(journal)];
+    default:                                 return [htmlActivityLog(journal)];
   }
 }
 
-// ── 공개 내보내기 함수 ────────────────────────────────────────────────────────
+async function renderHTMLToCanvas(html) {
+  const { default: html2canvas } = await import('html2canvas');
+
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:-9999px;top:0;background:white;z-index:-1;';
+  el.innerHTML = html;
+  document.body.appendChild(el);
+
+  try {
+    return await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+  } finally {
+    document.body.removeChild(el);
+  }
+}
+
+async function canvasToA4Pages(doc, canvas, isFirst) {
+  // A4 비율: 210:297 = canvas 기준으로 한 페이지 높이 계산
+  const pageHeightPx = Math.round(canvas.width * (297 / 210));
+  const numPages = Math.ceil(canvas.height / pageHeightPx);
+
+  for (let i = 0; i < numPages; i++) {
+    if (!isFirst || i > 0) doc.addPage();
+
+    const sliceH = Math.min(pageHeightPx, canvas.height - i * pageHeightPx);
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width;
+    slice.height = sliceH;
+    const ctx = slice.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, slice.width, slice.height);
+    ctx.drawImage(canvas, 0, -i * pageHeightPx);
+
+    const img = slice.toDataURL('image/jpeg', 0.96);
+    const sliceHmm = (sliceH / canvas.width) * 210;
+    doc.addImage(img, 'JPEG', 0, 0, 210, sliceHmm);
+  }
+}
+
+// ── 공개 PDF 내보내기 함수 ────────────────────────────────────────────────────
 
 export async function exportSingleJournalPDF(journal) {
-  const doc = await createPdf();
-  renderForm(doc, journal);
+  const pages = buildJournalPages(journal);
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  let isFirst = true;
+
+  for (const html of pages) {
+    const canvas = await renderHTMLToCanvas(html);
+    await canvasToA4Pages(doc, canvas, isFirst);
+    isFirst = false;
+  }
+
   const safe = (s) => s.replace(/[/\\?%*:|"<>]/g, '_');
   const name = safe(
-    `${journalTypeLabel(journal.type)}_${v(journal.childName) || '아동'}_${v(journal.date) || format(new Date(), 'yyyy-MM-dd')}.pdf`,
+    `${journalTypeLabel(journal.type)}_${journal.childName || '아동'}_${journal.date || format(new Date(), 'yyyy-MM-dd')}.pdf`,
   );
   doc.save(name);
 }
 
 export async function exportJournalFormPDF(journals) {
   if (!journals || journals.length === 0) throw new Error('선택된 양식이 없습니다.');
-  const doc = await createPdf();
-  journals.forEach((journal, i) => {
-    if (i > 0) doc.addPage();
-    renderForm(doc, journal);
-  });
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  let isFirst = true;
+
+  for (const journal of journals) {
+    const pages = buildJournalPages(journal);
+    for (const html of pages) {
+      const canvas = await renderHTMLToCanvas(html);
+      await canvasToA4Pages(doc, canvas, isFirst);
+      isFirst = false;
+    }
+  }
+
   doc.save('양식기록_출력.pdf');
 }
 
@@ -493,33 +443,37 @@ export async function exportJournalDOCX(journals) {
 }
 
 export async function exportBudgetPDF(items, meta) {
-  const doc = await createPdf();
-  const fn = f();
   const totalBudget = Number(meta.totalBudget) || 0;
   const totalSpent = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
-  doc.setFont(fn, 'normal');
-  doc.setFontSize(16);
-  doc.text(meta.title || '예산', 14, 18);
-  doc.setFontSize(9);
-  doc.text(`${meta.year}년 ${meta.month}월`, 14, 25);
-  doc.text(`총예산 ${totalBudget.toLocaleString()}원 / 지출 ${totalSpent.toLocaleString()}원`, 14, 31);
+  const bodyRows = items.map((item) => `
+    <tr>
+      <td style="${CS}text-align:center;">${esc(item.date)}</td>
+      <td style="${CS}">${esc(item.category)}</td>
+      <td style="${CS}">${esc(item.name)}</td>
+      <td style="${CS}text-align:right;">${(Number(item.amount) || 0).toLocaleString()}원</td>
+      <td style="${CS}">${esc(item.note)}</td>
+    </tr>`).join('');
 
-  autoTable(doc, {
-    startY: 37,
-    head: [['날짜', '카테고리', '항목명', '금액', '비고']],
-    body: items.map((item) => [
-      item.date || '',
-      item.category || '',
-      item.name || '',
-      `${(Number(item.amount) || 0).toLocaleString()}원`,
-      item.note || '',
-    ]),
-    foot: [['', '', '합계', `${totalSpent.toLocaleString()}원`, '']],
-    styles: { font: fn, fontSize: 9 },
-    headStyles: { fillColor: [82, 141, 90], font: fn },
-    footStyles: { font: fn, fillColor: [240, 249, 244], textColor: [0, 0, 0] },
-  });
+  const html = PAGE(`
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${esc(meta.title || '예산')}</div>
+    <div style="font-size:11px;color:#555;margin-bottom:6px;">${meta.year}년 ${meta.month}월 &nbsp;·&nbsp; 총예산 ${totalBudget.toLocaleString()}원 / 지출 ${totalSpent.toLocaleString()}원</div>
+    ${TABLE(`
+      <tr>
+        ${['날짜','카테고리','항목명','금액','비고'].map((h) => `<th style="${HS}">${h}</th>`).join('')}
+      </tr>
+      ${bodyRows}
+      <tr>
+        <td colspan="3" style="${LS}text-align:right;">합계</td>
+        <td style="${CS}text-align:right;font-weight:700;">${totalSpent.toLocaleString()}원</td>
+        <td style="${CS}"></td>
+      </tr>
+    `)}
+  `);
+
+  const canvas = await renderHTMLToCanvas(html);
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  await canvasToA4Pages(doc, canvas, true);
   doc.save('예산.pdf');
 }
 
