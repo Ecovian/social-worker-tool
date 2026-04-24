@@ -65,43 +65,21 @@ function getPhotoIds(photos = []) {
 }
 
 function createPlanRow(month = '') {
-  return {
-    id: genId(),
-    month,
-    sessionCount: '',
-    playArea: '',
-    activityContent: '',
-    planNo: '',
-    placeMaterials: '',
-  };
+  return { id: genId(), month, sessionCount: '', playArea: '', activityContent: '', planNo: '', placeMaterials: '' };
 }
 
 function createPeerLevelRow() {
-  return {
-    id: genId(),
-    childName: '',
-    playLevel: '',
-    notes: '',
-  };
+  return { id: genId(), childName: '', playLevel: '', notes: '' };
 }
 
 function createFamilyRow() {
-  return {
-    id: genId(),
-    relation: '',
-    name: '',
-    age: '',
-    disability: '',
-    notes: '',
-  };
+  return { id: genId(), relation: '', name: '', age: '', disability: '', notes: '' };
 }
 
 async function migrateLegacyPhotos(photos = []) {
   return Promise.all(
     photos.map(async (photo) => {
-      if (typeof photo === 'string') {
-        return savePhotoDataUrl(photo, { id: genId(), name: 'legacy-photo' });
-      }
+      if (typeof photo === 'string') return savePhotoDataUrl(photo, { id: genId(), name: 'legacy-photo' });
       return photo;
     }),
   );
@@ -109,11 +87,11 @@ async function migrateLegacyPhotos(photos = []) {
 
 async function deleteRemovedPhotos(previousPhotos = [], nextPhotos = []) {
   const nextIds = new Set(getPhotoIds(nextPhotos));
-  const removed = previousPhotos.filter((photo) => (
-    photo && typeof photo === 'object' && photo.id && !nextIds.has(photo.id)
-  ));
+  const removed = previousPhotos.filter((photo) => photo && typeof photo === 'object' && photo.id && !nextIds.has(photo.id));
   await deletePhotoRefs(removed);
 }
+
+// ── 공통 UI 컴포넌트 ──────────────────────────────────────────────────────────
 
 function LabeledField({ label, required = false, hint, children }) {
   return (
@@ -146,10 +124,7 @@ function SectionCard({ title, description, actions, children }) {
 function StatusPills({ value, onChange }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {[
-        { value: 'draft', label: '임시저장' },
-        { value: 'finalized', label: '확정본' },
-      ].map((item) => (
+      {[{ value: 'draft', label: '임시저장' }, { value: 'finalized', label: '확정본' }].map((item) => (
         <button
           key={item.value}
           type="button"
@@ -167,9 +142,99 @@ function StatusPills({ value, onChange }) {
   );
 }
 
+// ── 양식 테이블 기본 컴포넌트 ─────────────────────────────────────────────────
+
+function Tbl({ children }) {
+  return (
+    <table className="w-full border-collapse text-sm">
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+function Th({ children, colSpan, rowSpan, width, style = {}, className = '' }) {
+  return (
+    <th
+      colSpan={colSpan}
+      rowSpan={rowSpan}
+      style={{ width, verticalAlign: 'middle', whiteSpace: 'pre-line', ...style }}
+      className={`border border-gray-400 bg-gray-100 px-2 py-1.5 text-center text-xs font-medium text-gray-700 leading-tight ${className}`}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({ children, colSpan, rowSpan, className = '' }) {
+  return (
+    <td
+      colSpan={colSpan}
+      rowSpan={rowSpan}
+      className={`border border-gray-400 p-0 align-top ${className}`}
+    >
+      {children}
+    </td>
+  );
+}
+
+function TInput({ value, onChange, type = 'text', placeholder = '', className = '' }) {
+  return (
+    <input
+      type={type}
+      value={value || ''}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`w-full px-2 py-1.5 text-sm focus:outline-none focus:bg-blue-50/40 bg-transparent ${className}`}
+    />
+  );
+}
+
+function TArea({ value, onChange, rows = 4, placeholder = '' }) {
+  return (
+    <textarea
+      value={value || ''}
+      onChange={onChange}
+      rows={rows}
+      placeholder={placeholder}
+      className="w-full px-2 py-1.5 text-sm focus:outline-none focus:bg-blue-50/40 bg-transparent resize-none"
+    />
+  );
+}
+
+function TSelect({ value, onChange, options }) {
+  return (
+    <select
+      value={value || ''}
+      onChange={onChange}
+      className="w-full px-2 py-1.5 text-sm focus:outline-none bg-transparent"
+    >
+      {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+    </select>
+  );
+}
+
+function TRadio({ options, value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 px-2 py-1.5">
+      {options.map((opt) => (
+        <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-sm">
+          <input
+            type="radio"
+            checked={value === opt}
+            onChange={() => onChange(opt)}
+            className="accent-blue-600"
+          />
+          {opt}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// ── TypeSelector ──────────────────────────────────────────────────────────────
+
 function TypeSelector({ favorites, recents, onChoose, onToggleFavorite }) {
   const favoriteSet = new Set(favorites);
-
   return (
     <div className="space-y-6">
       {(favorites.length > 0 || recents.length > 0) && (
@@ -177,35 +242,22 @@ function TypeSelector({ favorites, recents, onChoose, onToggleFavorite }) {
           <div className="card p-5">
             <p className="mb-3 text-sm font-semibold text-gray-900">즐겨찾는 양식</p>
             <div className="flex flex-wrap gap-2">
-              {favorites.length === 0 && (
-                <p className="text-sm text-gray-400">즐겨찾기한 양식이 아직 없습니다.</p>
-              )}
+              {favorites.length === 0 && <p className="text-sm text-gray-400">즐겨찾기한 양식이 아직 없습니다.</p>}
               {favorites.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onChoose(type)}
-                  className="rounded-xl bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100"
-                >
+                <button key={type} type="button" onClick={() => onChoose(type)}
+                  className="rounded-xl bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100">
                   {journalTypeLabel(type)}
                 </button>
               ))}
             </div>
           </div>
-
           <div className="card p-5">
             <p className="mb-3 text-sm font-semibold text-gray-900">최근 사용 양식</p>
             <div className="flex flex-wrap gap-2">
-              {recents.length === 0 && (
-                <p className="text-sm text-gray-400">최근 사용 기록이 아직 없습니다.</p>
-              )}
+              {recents.length === 0 && <p className="text-sm text-gray-400">최근 사용 기록이 아직 없습니다.</p>}
               {recents.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onChoose(type)}
-                  className="rounded-xl bg-sage-50 px-3 py-2 text-sm font-medium text-sage-700 hover:bg-sage-100"
-                >
+                <button key={type} type="button" onClick={() => onChoose(type)}
+                  className="rounded-xl bg-sage-50 px-3 py-2 text-sm font-medium text-sage-700 hover:bg-sage-100">
                   {journalTypeLabel(type)}
                 </button>
               ))}
@@ -213,7 +265,6 @@ function TypeSelector({ favorites, recents, onChoose, onToggleFavorite }) {
           </div>
         </div>
       )}
-
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {JOURNAL_TYPE_OPTIONS.map((option) => (
           <div
@@ -221,12 +272,7 @@ function TypeSelector({ favorites, recents, onChoose, onToggleFavorite }) {
             role="button"
             tabIndex={0}
             onClick={() => onChoose(option.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onChoose(option.value);
-              }
-            }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChoose(option.value); } }}
             className="card cursor-pointer p-5 text-left transition-shadow hover:shadow-card-hover"
           >
             <div className="flex items-start justify-between gap-3">
@@ -237,16 +283,8 @@ function TypeSelector({ favorites, recents, onChoose, onToggleFavorite }) {
               </div>
               <button
                 type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggleFavorite(option.value);
-                }}
-                className={`rounded-lg p-2 ${
-                  favoriteSet.has(option.value)
-                    ? 'bg-amber-50 text-amber-600'
-                    : 'bg-gray-100 text-gray-400 hover:text-amber-600'
-                }`}
-                aria-label={`${option.label} 즐겨찾기`}
+                onClick={(e) => { e.stopPropagation(); onToggleFavorite(option.value); }}
+                className={`rounded-lg p-2 ${favoriteSet.has(option.value) ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-400 hover:text-amber-600'}`}
               >
                 <Star size={16} className={favoriteSet.has(option.value) ? 'fill-current' : ''} />
               </button>
@@ -260,7 +298,6 @@ function TypeSelector({ favorites, recents, onChoose, onToggleFavorite }) {
 
 function SummaryPreview({ suggestion }) {
   if (!suggestion) return null;
-
   return (
     <SectionCard title="자동 문장 초안" description="제목과 요약을 빠르게 정리할 때 참고하세요.">
       <div className="rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
@@ -272,9 +309,7 @@ function SummaryPreview({ suggestion }) {
               <div key={section.title}>
                 <p className="text-xs font-semibold text-primary-700">{section.title}</p>
                 <ul className="mt-1 space-y-1 text-sm text-gray-600">
-                  {section.lines.map((line) => (
-                    <li key={line}>- {line}</li>
-                  ))}
+                  {section.lines.map((line) => <li key={line}>- {line}</li>)}
                 </ul>
               </div>
             ))}
@@ -296,7 +331,6 @@ function PhotoUploadSection({ fileRef, onChange, previews, onRemove, hint }) {
         <p className="text-sm text-gray-500">클릭해서 사진을 추가하세요.</p>
       </div>
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onChange} />
-
       {previews.length > 0 && (
         <div className="photo-grid">
           {previews.map((preview, index) => (
@@ -317,35 +351,567 @@ function PhotoUploadSection({ fileRef, onChange, previews, onRemove, hint }) {
   );
 }
 
-function getActivityPreview(journal) {
-  if (journal.type === JOURNAL_TYPES.PLAY_PLAN_INDIVIDUAL) {
-    return journal.playGoal || journal.currentLevel || journal.summary || '';
-  }
-  if (journal.type === JOURNAL_TYPES.PLAY_PLAN_GROUP) {
-    return journal.groupPlan || journal.matchingGoal || journal.summary || '';
-  }
-  if (journal.type === JOURNAL_TYPES.INTERVIEW_LOG) {
-    return journal.consultationContent || journal.futurePlan || journal.summary || '';
-  }
-  if (journal.type === JOURNAL_TYPES.INITIAL_CONSULTATION) {
-    return journal.healthNotes || journal.serviceGoals || journal.summary || '';
-  }
-  return journal.detailedActivities || journal.content || journal.activityEvaluation || journal.summary || '';
-}
-
 function buildPhotoHint(type) {
-  if (type === JOURNAL_TYPES.INITIAL_CONSULTATION) {
-    return '아동 사진, 놀이공간, 놀잇감, 놀이 상황 사진을 필요에 따라 함께 첨부하세요.';
-  }
-  if (type === JOURNAL_TYPES.ACTIVITY_LOG) {
-    return '활동 장면 1~2장을 첨부해 활동일지와 함께 보관하세요.';
-  }
+  if (type === JOURNAL_TYPES.INITIAL_CONSULTATION) return '아동 사진, 놀이공간, 놀잇감, 놀이 상황 사진을 필요에 따라 함께 첨부하세요.';
+  if (type === JOURNAL_TYPES.ACTIVITY_LOG) return '활동 장면 1~2장을 첨부해 활동일지와 함께 보관하세요.';
   return '양식 보완에 필요한 사진을 첨부할 수 있습니다.';
 }
 
 function isValidType(value) {
   return JOURNAL_TYPE_OPTIONS.some((option) => option.value === value);
 }
+
+// ── 양식별 테이블 폼 ──────────────────────────────────────────────────────────
+
+/** 활동일지 */
+function ActivityLogForm({ form, setField }) {
+  const sf = (k) => (e) => setField(k, e.target.value);
+  return (
+    <SectionCard title="[서식9] 놀세이버 활동일지" description="활동일지(개별활동 / 소그룹활동) — 양식 순서대로 입력하세요.">
+      <div className="flex items-center gap-3 text-sm text-gray-600 pb-1">
+        <span>회차</span>
+        <input type="text" value={form.sessionNumber || ''} onChange={sf('sessionNumber')}
+          className="w-14 border-b border-gray-400 text-center focus:outline-none focus:border-blue-500 px-1" placeholder="0" />
+        <span>회 / 누적 시간</span>
+        <input type="text" value={form.cumulativeHours || ''} onChange={sf('cumulativeHours')}
+          className="w-14 border-b border-gray-400 text-center focus:outline-none focus:border-blue-500 px-1" placeholder="0" />
+        <span>시간</span>
+      </div>
+
+      <Tbl>
+        <colgroup>
+          <col style={{ width: '15%' }} />
+          <col style={{ width: '18%' }} />
+          <col style={{ width: '17%' }} />
+          <col style={{ width: '13%' }} />
+          <col />
+        </colgroup>
+        <tr>
+          <Th>{'놀세이버명\n(소그룹 구성원)'}</Th>
+          <Td colSpan={2}><TInput value={form.saverName} onChange={sf('saverName')} placeholder="놀세이버명" /></Td>
+          <Th>활동 일시</Th>
+          <Td>
+            <div className="flex items-center gap-1 px-2 py-1">
+              <input type="date" value={form.date || ''} onChange={sf('date')} className="text-sm focus:outline-none flex-1 min-w-0" />
+              <input type="time" value={form.time || ''} onChange={sf('time')} className="text-sm focus:outline-none w-24" />
+            </div>
+          </Td>
+        </tr>
+        <tr>
+          <Th>{'아동명\n(소그룹 구성원)'}</Th>
+          <Td colSpan={2}><TInput value={form.childName} onChange={sf('childName')} placeholder="아동명" /></Td>
+          <Th>아동연령</Th>
+          <Td><TInput value={form.childAge} onChange={sf('childAge')} placeholder="예: 9세" /></Td>
+        </tr>
+        <tr>
+          <Th>활동계획안 NO.</Th>
+          <Td colSpan={2}><TInput value={form.activityPlanNo} onChange={sf('activityPlanNo')} /></Td>
+          <Th>활동구분</Th>
+          <Td><TRadio options={ACTIVITY_KIND_OPTIONS} value={form.activityKind} onChange={(v) => setField('activityKind', v)} /></Td>
+        </tr>
+        <tr>
+          <Th>활동장소</Th>
+          <Td colSpan={2}><TInput value={form.activityPlace} onChange={sf('activityPlace')} /></Td>
+          <Th>만족도</Th>
+          <Td><TSelect value={form.satisfaction} onChange={sf('satisfaction')} options={SATISFACTION_OPTIONS} /></Td>
+        </tr>
+        <tr>
+          <Th>활동 주제</Th>
+          <Td colSpan={4}><TInput value={form.activitySubject} onChange={sf('activitySubject')} /></Td>
+        </tr>
+        <tr>
+          <Th>놀잇감/사용 교구</Th>
+          <Td colSpan={4}><TInput value={form.playMaterials} onChange={sf('playMaterials')} /></Td>
+        </tr>
+        <tr>
+          <Th rowSpan={1}>{'세부\n활동\n내용'}</Th>
+          <Th style={{ fontSize: '10px', textAlign: 'left' }}>{'놀이과정\n*관찰내용\n*놀세이버와\n또래아동이\n나눈 내용 등'}</Th>
+          <Td colSpan={3}>
+            <TArea value={form.detailedActivities} onChange={sf('detailedActivities')} rows={7}
+              placeholder="놀이 과정, 관찰 내용, 대화 내용 등을 상세히 기록하세요" />
+          </Td>
+        </tr>
+      </Tbl>
+
+      <Tbl>
+        <colgroup>
+          <col style={{ width: '20%' }} />
+          <col />
+        </colgroup>
+        <tr>
+          <Th>{'놀세이버 의견\n(아동의 변화,\n보호자 면담 내용 등)'}</Th>
+          <Td>
+            <TArea value={form.saverOpinion} onChange={sf('saverOpinion')} rows={5}
+              placeholder="※ 활동 평가 및 의견. 부모와 상담 또는 부모 의견 등 작성" />
+          </Td>
+        </tr>
+        <tr>
+          <Th>활동 사진</Th>
+          <Td className="px-3 py-2 text-xs text-gray-400">
+            ※ 1~2 장면 — 아래 [사진 첨부] 섹션에서 추가하세요. (원본 별도 보관 필요)
+          </Td>
+        </tr>
+      </Tbl>
+    </SectionCard>
+  );
+}
+
+/** 면담일지 */
+function InterviewLogForm({ form, setField }) {
+  const sf = (k) => (e) => setField(k, e.target.value);
+  return (
+    <SectionCard title="면담/상담 일지" description="상담 내용과 향후 계획을 양식 순서대로 입력하세요.">
+      <Tbl>
+        <colgroup>
+          <col style={{ width: '18%' }} />
+          <col style={{ width: '30%' }} />
+          <col style={{ width: '16%' }} />
+          <col />
+        </colgroup>
+        <tr>
+          <Th>놀세이버명</Th>
+          <Td><TInput value={form.saverName} onChange={sf('saverName')} /></Td>
+          <Th>상담일자</Th>
+          <Td><TInput type="date" value={form.consultationDate} onChange={sf('consultationDate')} /></Td>
+        </tr>
+        <tr>
+          <Th>아동명</Th>
+          <Td><TInput value={form.childName} onChange={sf('childName')} /></Td>
+          <Th>{'면담자\n(보호자명)'}</Th>
+          <Td><TInput value={form.intervieweeName} onChange={sf('intervieweeName')} /></Td>
+        </tr>
+        <tr>
+          <Th>{'상담 수행\n방법 구분'}</Th>
+          <Td>
+            <TRadio options={CONSULTATION_METHOD_OPTIONS} value={form.consultationMethod}
+              onChange={(v) => setField('consultationMethod', v)} />
+            {form.consultationMethod === '기타' && (
+              <div className="px-2 pb-1">
+                <TInput value={form.infoProviderDetail} onChange={sf('infoProviderDetail')} placeholder="기타 내용 입력" />
+              </div>
+            )}
+          </Td>
+          <Th>{'상담정보\n제공자'}</Th>
+          <Td>
+            <TRadio options={INFO_PROVIDER_OPTIONS} value={form.infoProvider}
+              onChange={(v) => setField('infoProvider', v)} />
+          </Td>
+        </tr>
+        <tr>
+          <Th>{'상담(면담)\n내용'}</Th>
+          <Td colSpan={3}>
+            <TArea value={form.consultationContent} onChange={sf('consultationContent')} rows={8}
+              placeholder={'1) 아동의 놀이활동 내용 및 놀이관련 정보 제공\n2) 아동의 변화 및 놀이 특성\n3) 특이사항 등 공유\n4) 향후 계획 공유\n5) 아동 및 보호자의 욕구 파악'} />
+          </Td>
+        </tr>
+        <tr>
+          <Th>{'향후 개입 계획\n및 보호자\n상담 결과'}</Th>
+          <Td colSpan={3}><TArea value={form.futurePlan} onChange={sf('futurePlan')} rows={5} /></Td>
+        </tr>
+      </Tbl>
+    </SectionCard>
+  );
+}
+
+/** 초기상담기록지 */
+function InitialConsultationForm({ form, setField, updateRow, addRow, removeRow }) {
+  const sf = (k) => (e) => setField(k, e.target.value);
+  return (
+    <>
+      <SectionCard title="[서식7] 초기상담 기록지 — 기본정보" description="아동 기본 인적사항과 가족관계를 입력하세요.">
+        <Tbl>
+          <colgroup>
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '11%' }} />
+            <col />
+          </colgroup>
+          <tr>
+            <Th>아동명</Th>
+            <Td colSpan={2}><TInput value={form.childName} onChange={sf('childName')} /></Td>
+            <Th>{'생년월일\n(연령)'}</Th>
+            <Td><TInput type="date" value={form.birthDate} onChange={sf('birthDate')} /></Td>
+            <Th>성별</Th>
+            <Td><TInput value={form.gender} onChange={sf('gender')} placeholder="남/여" /></Td>
+          </tr>
+          <tr>
+            <Th>{'장애 유형\n장애 정도'}</Th>
+            <Td><TInput value={form.disabilityType} onChange={sf('disabilityType')} placeholder="장애 유형" /></Td>
+            <Td><TInput value={form.disabilityLevel} onChange={sf('disabilityLevel')} placeholder="장애 정도" /></Td>
+            <Th>비상연락처</Th>
+            <Td colSpan={3}><TInput value={form.emergencyContact} onChange={sf('emergencyContact')} /></Td>
+          </tr>
+          <tr>
+            <Th>{'아동 질병/질환\n(건강상\n특이사항)'}</Th>
+            <Td colSpan={6}><TArea value={form.healthNotes} onChange={sf('healthNotes')} rows={3} /></Td>
+          </tr>
+        </Tbl>
+
+        {/* 가족관계 */}
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-gray-600 mb-1">가족관계</p>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                {['관계', '이름', '연령', '장애유무', '특이사항 (질병, 동거 여부 등)', ''].map((h) => (
+                  <th key={h} className="border border-gray-400 bg-gray-200 px-2 py-1 text-xs font-medium text-gray-700 text-center">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {form.familyRows.map((row) => (
+                <tr key={row.id}>
+                  <td className="border border-gray-400 p-0 w-16"><TInput value={row.relation} onChange={(e) => updateRow('familyRows', row.id, 'relation', e.target.value)} /></td>
+                  <td className="border border-gray-400 p-0 w-20"><TInput value={row.name} onChange={(e) => updateRow('familyRows', row.id, 'name', e.target.value)} /></td>
+                  <td className="border border-gray-400 p-0 w-14"><TInput value={row.age} onChange={(e) => updateRow('familyRows', row.id, 'age', e.target.value)} /></td>
+                  <td className="border border-gray-400 p-0 w-16"><TInput value={row.disability} onChange={(e) => updateRow('familyRows', row.id, 'disability', e.target.value)} /></td>
+                  <td className="border border-gray-400 p-0"><TInput value={row.notes} onChange={(e) => updateRow('familyRows', row.id, 'notes', e.target.value)} /></td>
+                  <td className="border border-gray-400 p-1 w-8 text-center">
+                    <button type="button" onClick={() => removeRow('familyRows', row.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" onClick={() => addRow('familyRows', createFamilyRow)} className="btn-secondary mt-2">
+            <PlusCircle size={13} /> 가족 추가
+          </button>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="초기상담 기록지 — 여가시간" description="아동의 여가 활동과 놀이 환경을 파악하세요.">
+        <Tbl>
+          <colgroup><col style={{ width: '22%' }} /><col /></colgroup>
+          <tr>
+            <Th>{'가정이나\n지역사회에서\n즐겨하는 활동은?'}</Th>
+            <Td><TArea value={form.leisureActivity} onChange={sf('leisureActivity')} rows={3} /></Td>
+          </tr>
+          <tr>
+            <Th>{'자주 가는 곳\n(공간)은?'}</Th>
+            <Td><TArea value={form.frequentPlace} onChange={sf('frequentPlace')} rows={2} /></Td>
+          </tr>
+          <tr>
+            <Th>{'혼자 노는\n시간은?'}</Th>
+            <Td><TSelect value={form.soloPlayTimeRange} onChange={sf('soloPlayTimeRange')} options={SOLO_PLAY_TIME_OPTIONS} /></Td>
+          </tr>
+          <tr>
+            <Th>{'장난감\n종류(다양성)'}</Th>
+            <Td><TSelect value={form.toyTypeLevel} onChange={sf('toyTypeLevel')} options={LEVEL_OPTIONS} /></Td>
+          </tr>
+          <tr>
+            <Th>{'장난감\n양(갯수)'}</Th>
+            <Td><TSelect value={form.toyQuantityLevel} onChange={sf('toyQuantityLevel')} options={LEVEL_OPTIONS} /></Td>
+          </tr>
+        </Tbl>
+      </SectionCard>
+
+      <SectionCard title="초기상담 기록지 — 또래관계 · 진로 · 욕구" description="아동의 관계, 목표, 욕구, 주의사항을 기록하세요.">
+        <Tbl>
+          <colgroup><col style={{ width: '22%' }} /><col /></colgroup>
+          <tr>
+            <Th>또래관계</Th>
+            <Td>
+              <TArea value={form.peerActivities} onChange={sf('peerActivities')} rows={3}
+                placeholder={'1) 친구와 주로 하는 활동은?'} />
+              <div className="border-t border-gray-200">
+                <TArea value={form.peerNotes} onChange={sf('peerNotes')} rows={2}
+                  placeholder="2) 또래 관계에 대해 알고 있어야 할 부분은?" />
+              </div>
+            </Td>
+          </tr>
+          <tr>
+            <Th>진로</Th>
+            <Td>
+              <TArea value={form.dream} onChange={sf('dream')} rows={2} placeholder="1) 아동의 꿈은?" />
+              <div className="border-t border-gray-200">
+                <TArea value={form.strengths} onChange={sf('strengths')} rows={2} placeholder="2) 아동의 특기는?" />
+              </div>
+            </Td>
+          </tr>
+          <tr>
+            <Th>욕구</Th>
+            <Td>
+              <TArea value={form.favoriteThings} onChange={sf('favoriteThings')} rows={2}
+                placeholder="1) 아동이 가장 즐겨 하는 것은 무엇입니까? (좋아하는 놀이, 친구, 장소 등)" />
+              <div className="border-t border-gray-200">
+                <TArea value={form.serviceGoals} onChange={sf('serviceGoals')} rows={2}
+                  placeholder="2) 보호자와 아동이 이 서비스를 통해 얻고 싶은 점은?" />
+              </div>
+            </Td>
+          </tr>
+          <tr>
+            <Th>{'아동에 대해\n주의해야\n하는 점'}</Th>
+            <Td>
+              <TArea value={form.cautionBehavior} onChange={sf('cautionBehavior')} rows={2}
+                placeholder="1) 문제행동이나 자극이 되는 부분" />
+              <div className="border-t border-gray-200">
+                <TArea value={form.cautionHealth} onChange={sf('cautionHealth')} rows={2}
+                  placeholder="2) 질병과 알레르기" />
+              </div>
+              <div className="border-t border-gray-200">
+                <TArea value={form.cautionTips} onChange={sf('cautionTips')} rows={2}
+                  placeholder="3) 돌발행동 상황에서 놀이교사가 대처할 수 있는 Tip" />
+              </div>
+            </Td>
+          </tr>
+          <tr>
+            <Th>{'외부 놀이에\n대한 욕구'}</Th>
+            <Td>
+              <TArea value={form.outdoorPlayWish} onChange={sf('outdoorPlayWish')} rows={2}
+                placeholder="1) 외부(가정 밖) 놀이를 희망하시나요?" />
+              <div className="border-t border-gray-200">
+                <TArea value={form.outdoorPlayNotes} onChange={sf('outdoorPlayNotes')} rows={2}
+                  placeholder="2) 외부 놀이 시, 놀이교사가 주의 해야 할 점은?" />
+              </div>
+            </Td>
+          </tr>
+        </Tbl>
+      </SectionCard>
+    </>
+  );
+}
+
+/** 놀이계획서-소그룹 */
+function GroupPlayPlanForm({ form, setField, updateRow, addRow, removeRow }) {
+  const sf = (k) => (e) => setField(k, e.target.value);
+  return (
+    <>
+      <SectionCard title="[서식8] 놀이계획서 — 소그룹" description="소그룹/집단 놀이계획서를 양식 순서대로 입력하세요.">
+        <Tbl>
+          <colgroup>
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '12%' }} />
+            <col />
+          </colgroup>
+          <tr>
+            <Th>활동일시</Th>
+            <Td><TInput type="date" value={form.date} onChange={sf('date')} /></Td>
+            <Th>{'월    일    요일\n활동 시간 :'}</Th>
+            <Td><TInput type="time" value={form.time} onChange={sf('time')} /></Td>
+            <Th>장소</Th>
+            <Td><TInput value={form.location} onChange={sf('location')} /></Td>
+          </tr>
+          <tr>
+            <Th>{'참여 놀세이버\n이름'}</Th>
+            <Td colSpan={5}><TInput value={form.participantSaverNames} onChange={sf('participantSaverNames')} placeholder="쉼표로 구분" /></Td>
+          </tr>
+          <tr>
+            <Th>{'참여\n아동이름(연령)'}</Th>
+            <Td colSpan={5}><TInput value={form.participantChildrenSummary} onChange={sf('participantChildrenSummary')} placeholder="예: 김민수(9세), 이수아(10세)" /></Td>
+          </tr>
+        </Tbl>
+      </SectionCard>
+
+      <SectionCard title="아동별 또래와의 놀이활동 수준" description="참여 아동별 놀이 수준과 특성을 입력하세요.">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr>
+              {['아동명', '또래와의 놀이활동 수준 및 특성', ''].map((h) => (
+                <th key={h} className="border border-gray-400 bg-gray-200 px-2 py-1 text-xs font-medium text-gray-700 text-center">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {form.peerLevelRows.map((row) => (
+              <tr key={row.id}>
+                <td className="border border-gray-400 p-0 w-28"><TInput value={row.childName} onChange={(e) => updateRow('peerLevelRows', row.id, 'childName', e.target.value)} /></td>
+                <td className="border border-gray-400 p-0">
+                  <TArea value={`${row.playLevel}${row.notes ? '\n' + row.notes : ''}`}
+                    onChange={(e) => {
+                      const [first, ...rest] = e.target.value.split('\n');
+                      updateRow('peerLevelRows', row.id, 'playLevel', first);
+                      updateRow('peerLevelRows', row.id, 'notes', rest.join('\n'));
+                    }} rows={2} />
+                </td>
+                <td className="border border-gray-400 p-1 w-8 text-center">
+                  <button type="button" onClick={() => removeRow('peerLevelRows', row.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" onClick={() => addRow('peerLevelRows', createPeerLevelRow)} className="btn-secondary mt-2">
+          <PlusCircle size={13} /> 아동 추가
+        </button>
+      </SectionCard>
+
+      <SectionCard title="매칭 특성 · 활동 목표 · 준비물" description="소그룹 매칭 목표와 활동 계획을 입력하세요.">
+        <Tbl>
+          <colgroup><col style={{ width: '22%' }} /><col /></colgroup>
+          <tr>
+            <Th>{'소그룹 매칭\n특성 및\n활동 목표'}</Th>
+            <Td>
+              <TArea value={form.matchingGoal} onChange={(e) => setField('matchingGoal', e.target.value)} rows={5}
+                placeholder="※ 소그룹 놀이 관련 목표 계획에 따른 활동 작성, 상세하게 작성" />
+            </Td>
+          </tr>
+          <tr>
+            <Th>{'놀이 활동 계획\n활동 계획'}</Th>
+            <Td><TArea value={form.groupPlan} onChange={(e) => setField('groupPlan', e.target.value)} rows={5} /></Td>
+          </tr>
+          <tr>
+            <Th>{'구매 필요한 물품\n(협력기관에\n협조 요청 사항)'}</Th>
+            <Td><TArea value={form.neededMaterials} onChange={(e) => setField('neededMaterials', e.target.value)} rows={3} /></Td>
+          </tr>
+          <tr>
+            <Th>비고</Th>
+            <Td><TInput value={form.note} onChange={(e) => setField('note', e.target.value)} /></Td>
+          </tr>
+        </Tbl>
+      </SectionCard>
+    </>
+  );
+}
+
+/** 놀이계획서-개별 */
+function IndividualPlayPlanForm({ form, setField, updateRow, addRow, removeRow, fillPlanRowsByPeriod }) {
+  const sf = (k) => (e) => setField(k, e.target.value);
+  return (
+    <>
+      <SectionCard title="[서식8] 놀이계획서 — 개별" description="개별 놀이계획서 기본 정보를 입력하세요.">
+        <Tbl>
+          <colgroup>
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '14%' }} />
+            <col />
+          </colgroup>
+          <tr>
+            <Th>놀세이버명</Th>
+            <Td><TInput value={form.saverName} onChange={sf('saverName')} /></Td>
+            <Th>(인)</Th>
+            <Th>{'계획\n일시'}</Th>
+            <Td><TInput type="date" value={form.date} onChange={sf('date')} /></Td>
+          </tr>
+          <tr>
+            <Th>아동명</Th>
+            <Td colSpan={2}><TInput value={form.childName} onChange={sf('childName')} /></Td>
+            <Th>아동연령</Th>
+            <Td>
+              <div className="flex gap-1 px-2 py-1">
+                <input type="text" value={form.childAge || ''} onChange={sf('childAge')} placeholder="세" className="w-14 text-sm focus:outline-none border-b border-gray-300" />
+                <span className="text-sm">세 (</span>
+                <input type="text" value={form.childGrade || ''} onChange={sf('childGrade')} placeholder="학년" className="w-14 text-sm focus:outline-none border-b border-gray-300" />
+                <span className="text-sm">학년)</span>
+              </div>
+            </Td>
+          </tr>
+          <tr>
+            <Th>상·하반기</Th>
+            <Td colSpan={2}>
+              <TRadio options={PLAN_PERIOD_OPTIONS} value={form.planPeriod} onChange={(v) => setField('planPeriod', v)} />
+            </Td>
+            <Th>{'활동\n시간'}</Th>
+            <Td><TInput value={form.activityTimeText} onChange={sf('activityTimeText')} placeholder="예: 매주 월요일 14시~15시" /></Td>
+          </tr>
+          <tr>
+            <Th>활동 기간</Th>
+            <Td>
+              <div className="flex items-center gap-1 px-2 py-1 text-sm">
+                <input type="date" value={form.activityStartDate || ''} onChange={sf('activityStartDate')} className="text-sm focus:outline-none flex-1 min-w-0" />
+                <span>~</span>
+                <input type="date" value={form.activityEndDate || ''} onChange={sf('activityEndDate')} className="text-sm focus:outline-none flex-1 min-w-0" />
+              </div>
+            </Td>
+            <Td colSpan={2} className="px-2 py-1 text-xs text-gray-400">
+              <TInput value={form.weeklyCountText} onChange={sf('weeklyCountText')} placeholder="주간 / 회 (예: 8주간 / 8회)" />
+            </Td>
+          </tr>
+          <tr>
+            <Th>현행 수준</Th>
+            <Td colSpan={4}><TArea value={form.currentLevel} onChange={sf('currentLevel')} rows={3} /></Td>
+          </tr>
+          <tr>
+            <Th>놀이 목표</Th>
+            <Td colSpan={4}>
+              <TArea value={form.playGoal} onChange={sf('playGoal')} rows={3}
+                placeholder="※ 아동별 학습/놀이관련 목표 계획에 따른 활동 작성, 상세하게 작성" />
+            </Td>
+          </tr>
+        </Tbl>
+      </SectionCard>
+
+      <SectionCard
+        title="월별 놀이 활동 계획"
+        description={`${form.planPeriod} 월별 계획을 입력하세요.`}
+        actions={
+          <button type="button" onClick={fillPlanRowsByPeriod} className="btn-secondary">
+            <RefreshCcw size={13} /> {form.planPeriod} 행 자동 생성
+          </button>
+        }
+      >
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr>
+              {['회차(월)', '회기수', '놀이 영역', '활동 내용', '활동계획안 NO.', '활동 장소 및 구매 필요한 물품', ''].map((h) => (
+                <th key={h} className="border border-gray-400 bg-gray-200 px-1 py-1.5 text-xs font-medium text-gray-700 text-center whitespace-pre-line leading-tight">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {form.planRows.map((row) => (
+              <tr key={row.id}>
+                <td className="border border-gray-400 p-0 w-16"><TInput value={row.month} onChange={(e) => updateRow('planRows', row.id, 'month', e.target.value)} /></td>
+                <td className="border border-gray-400 p-0 w-14"><TInput value={row.sessionCount} onChange={(e) => updateRow('planRows', row.id, 'sessionCount', e.target.value)} /></td>
+                <td className="border border-gray-400 p-0 w-20"><TInput value={row.playArea} onChange={(e) => updateRow('planRows', row.id, 'playArea', e.target.value)} /></td>
+                <td className="border border-gray-400 p-0"><TArea value={row.activityContent} onChange={(e) => updateRow('planRows', row.id, 'activityContent', e.target.value)} rows={2} /></td>
+                <td className="border border-gray-400 p-0 w-16"><TInput value={row.planNo} onChange={(e) => updateRow('planRows', row.id, 'planNo', e.target.value)} /></td>
+                <td className="border border-gray-400 p-0"><TArea value={row.placeMaterials} onChange={(e) => updateRow('planRows', row.id, 'placeMaterials', e.target.value)} rows={2} /></td>
+                <td className="border border-gray-400 p-1 w-8 text-center">
+                  <button type="button" onClick={() => removeRow('planRows', row.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                </td>
+              </tr>
+            ))}
+            {form.planRows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="border border-gray-400 px-3 py-4 text-center text-sm text-gray-400">
+                  위의 「{form.planPeriod} 행 자동 생성」 버튼을 눌러 월별 행을 만드세요.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="border border-gray-400 bg-gray-100 px-2 py-1.5 text-xs font-medium text-center">합계</td>
+              <td colSpan={6} className="border border-gray-400 px-2 py-1 text-xs text-gray-400">총 회기수/놀이시간 작성</td>
+            </tr>
+          </tfoot>
+        </table>
+        <button type="button" onClick={() => addRow('planRows', createPlanRow)} className="btn-secondary mt-2">
+          <PlusCircle size={13} /> 행 추가
+        </button>
+      </SectionCard>
+    </>
+  );
+}
+
+/** 양식별 라우터 */
+function TypeSpecificFields({ form, setField, updateRow, addRow, removeRow, fillPlanRowsByPeriod }) {
+  if (form.type === JOURNAL_TYPES.ACTIVITY_LOG) {
+    return <ActivityLogForm form={form} setField={setField} />;
+  }
+  if (form.type === JOURNAL_TYPES.INTERVIEW_LOG) {
+    return <InterviewLogForm form={form} setField={setField} />;
+  }
+  if (form.type === JOURNAL_TYPES.INITIAL_CONSULTATION) {
+    return <InitialConsultationForm form={form} setField={setField} updateRow={updateRow} addRow={addRow} removeRow={removeRow} />;
+  }
+  if (form.type === JOURNAL_TYPES.PLAY_PLAN_GROUP) {
+    return <GroupPlayPlanForm form={form} setField={setField} updateRow={updateRow} addRow={addRow} removeRow={removeRow} />;
+  }
+  if (form.type === JOURNAL_TYPES.PLAY_PLAN_INDIVIDUAL) {
+    return <IndividualPlayPlanForm form={form} setField={setField} updateRow={updateRow} addRow={addRow} removeRow={removeRow} fillPlanRowsByPeriod={fillPlanRowsByPeriod} />;
+  }
+  return null;
+}
+
+// ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
 export default function JournalForm() {
   const { id } = useParams();
@@ -374,12 +940,16 @@ export default function JournalForm() {
   const [favoriteTypes, setFavoriteTypes] = useState(getFavoriteJournalTypes());
   const [recentTypes, setRecentTypes] = useState(getRecentJournalTypes());
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState('');
 
   async function handlePdfDownload() {
     setPdfLoading(true);
+    setPdfError('');
     try {
       const { exportSingleJournalPDF } = await import('../lib/exportUtils');
       await exportSingleJournalPDF(form);
+    } catch (err) {
+      setPdfError(`PDF 생성 실패: ${err.message}`);
     } finally {
       setPdfLoading(false);
     }
@@ -400,9 +970,7 @@ export default function JournalForm() {
   function buildNewJournal(type) {
     const base = createEmptyJournal(type);
     const requestedClient = requestedClientId ? getClient(requestedClientId) : null;
-
     if (!requestedClient) return base;
-
     return {
       ...base,
       clientId: requestedClient.id,
@@ -422,10 +990,8 @@ export default function JournalForm() {
     if (!isNew) {
       const existing = getJournal(id);
       if (!existing) return;
-
       const draft = getJournalDraft(id);
       const initial = draft ? { ...existing, ...draft } : existing;
-
       setSelectedType(initial.type);
       setForm(initial);
       setBaseJournal(existing);
@@ -463,7 +1029,6 @@ export default function JournalForm() {
 
   useEffect(() => {
     let ignore = false;
-
     async function loadPreviews() {
       const previews = await Promise.all(
         (form.photos || []).map(async (photo, index) => ({
@@ -471,38 +1036,25 @@ export default function JournalForm() {
           src: await getPhotoDataUrl(photo),
         })),
       );
-
-      if (!ignore) {
-        setPhotoPreviews(previews.filter((preview) => preview.src));
-      }
+      if (!ignore) setPhotoPreviews(previews.filter((p) => p.src));
     }
-
     loadPreviews();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [form.photos]);
 
   useEffect(() => {
     if (!hasUnsavedChanges || (isNew && !selectedType)) return undefined;
-
     const timer = window.setTimeout(() => {
       const ok = saveJournalDraft(draftKey, form);
       setHasDraft(ok);
       setDraftStatus(ok ? '작성 중인 내용이 자동 저장되었습니다.' : '임시저장에 실패했습니다. 브라우저 저장공간을 확인해 주세요.');
     }, 500);
-
     return () => window.clearTimeout(timer);
   }, [draftKey, form, hasUnsavedChanges, isNew, selectedType]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return undefined;
-
-    const onBeforeUnload = (event) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [hasUnsavedChanges]);
@@ -528,18 +1080,10 @@ export default function JournalForm() {
     }));
   }
 
-  function chooseType(type) {
-    setSelectedType(type);
-  }
-
   function applySuggestion() {
     const suggestion = buildJournalSuggestion({
-      type: currentType,
-      commonFields: form,
-      typeFields: form,
-      recentEntries: recentSameType.slice(0, 3),
+      type: currentType, commonFields: form, typeFields: form, recentEntries: recentSameType.slice(0, 3),
     });
-
     setSuggestionPreview(suggestion);
     updateForm((prev) => ({
       ...prev,
@@ -553,16 +1097,9 @@ export default function JournalForm() {
     const recent = recentSameType[0];
     updateForm((prev) => ({
       ...recent,
-      id: prev.id,
-      type: prev.type,
-      status: prev.status,
-      clientId: prev.clientId,
-      childName: prev.childName,
-      date: prev.date,
-      time: prev.time,
-      photos: prev.photos,
-      createdAt: prev.createdAt,
-      updatedAt: prev.updatedAt,
+      id: prev.id, type: prev.type, status: prev.status, clientId: prev.clientId,
+      childName: prev.childName, date: prev.date, time: prev.time, photos: prev.photos,
+      createdAt: prev.createdAt, updatedAt: prev.updatedAt,
     }));
   }
 
@@ -590,71 +1127,47 @@ export default function JournalForm() {
   }
 
   function addRow(listKey, factory) {
-    updateForm((prev) => ({
-      ...prev,
-      [listKey]: [...prev[listKey], factory()],
-    }));
+    updateForm((prev) => ({ ...prev, [listKey]: [...prev[listKey], factory()] }));
   }
 
   function removeRow(listKey, rowId) {
-    updateForm((prev) => ({
-      ...prev,
-      [listKey]: prev[listKey].filter((row) => row.id !== rowId),
-    }));
+    updateForm((prev) => ({ ...prev, [listKey]: prev[listKey].filter((row) => row.id !== rowId) }));
   }
 
   async function handlePhotos(event) {
     const files = Array.from(event.target.files || []);
-
     try {
       const nextPhotos = await Promise.all(files.map((file) => savePhotoFile(file)));
-      updateForm((prev) => ({
-        ...prev,
-        photos: [...prev.photos, ...nextPhotos],
-      }));
+      updateForm((prev) => ({ ...prev, photos: [...prev.photos, ...nextPhotos] }));
     } catch (error) {
       setSaveError(error?.message || '사진 저장 중 오류가 발생했습니다.');
     }
-
     event.target.value = '';
   }
 
   async function removePhoto(index) {
     const target = form.photos[index];
-    updateForm((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((_, currentIndex) => currentIndex !== index),
-    }));
-
+    updateForm((prev) => ({ ...prev, photos: prev.photos.filter((_, i) => i !== index) }));
     if (target && typeof target === 'object' && target.id) {
       const baseIds = new Set(getPhotoIds(baseJournal?.photos || []));
-      if (!baseIds.has(target.id)) {
-        await deletePhotoRefs([target]);
-      }
+      if (!baseIds.has(target.id)) await deletePhotoRefs([target]);
     }
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     if (!currentType) return;
-
     try {
       const normalizedPhotos = await migrateLegacyPhotos(form.photos);
       const suggestion = buildJournalSuggestion({
-        type: currentType,
-        commonFields: form,
-        typeFields: form,
-        recentEntries: recentSameType.slice(0, 3),
+        type: currentType, commonFields: form, typeFields: form, recentEntries: recentSameType.slice(0, 3),
       });
-
       const savedJournal = saveJournal({
-        ...form,
-        type: currentType,
+        ...form, type: currentType,
         title: form.title || template.defaultTitle,
         summary: form.summary || suggestion.summary,
         photos: normalizedPhotos,
       });
-
       clearJournalDraft(draftKey);
       await deleteRemovedPhotos(baseJournal?.photos || [], normalizedPhotos);
       setBaseJournal(savedJournal);
@@ -666,10 +1179,7 @@ export default function JournalForm() {
       setAllJournals(getJournals());
       setRecentTypes(getRecentJournalTypes());
       window.setTimeout(() => setSaved(false), 1800);
-
-      if (isNew) {
-        navigate(`/journal/${savedJournal.id}`, { replace: true });
-      }
+      if (isNew) navigate(`/journal/${savedJournal.id}`, { replace: true });
     } catch (error) {
       setSaveError(error?.message || '저장 중 오류가 발생했습니다.');
     }
@@ -685,13 +1195,8 @@ export default function JournalForm() {
   async function resetDraft() {
     clearJournalDraft(draftKey);
     await deleteRemovedPhotos(form.photos || [], baseJournal?.photos || []);
-
-    if (isNew) {
-      setForm(buildNewJournal(currentType));
-    } else if (baseJournal) {
-      setForm(baseJournal);
-    }
-
+    if (isNew) setForm(buildNewJournal(currentType));
+    else if (baseJournal) setForm(baseJournal);
     setHasDraft(false);
     setHasUnsavedChanges(false);
     setDraftStatus('임시저장 내용을 비웠습니다.');
@@ -703,12 +1208,12 @@ export default function JournalForm() {
       <div className="animate-fade-in">
         <PageHeader
           title="양식 작성"
-          subtitle="제공하신 5개 공식 양식만 보이도록 정리했습니다. 먼저 작성할 양식을 선택해 주세요."
+          subtitle="작성할 양식을 선택하세요."
         />
         <TypeSelector
           favorites={favoriteTypes}
           recents={recentTypes}
-          onChoose={chooseType}
+          onChoose={(type) => setSelectedType(type)}
           onToggleFavorite={(type) => setFavoriteTypes(toggleFavoriteJournalType(type))}
         />
       </div>
@@ -723,8 +1228,7 @@ export default function JournalForm() {
         actions={(
           <div className="flex flex-wrap gap-2">
             <Link to="/journals" className="btn-secondary">
-              <ArrowLeft size={14} />
-              목록으로
+              <ArrowLeft size={14} /> 목록으로
             </Link>
             {!isNew && (
               <button
@@ -738,14 +1242,7 @@ export default function JournalForm() {
               </button>
             )}
             {isNew && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedType('');
-                  setSuggestionPreview(null);
-                }}
-                className="btn-secondary"
-              >
+              <button type="button" onClick={() => { setSelectedType(''); setSuggestionPreview(null); }} className="btn-secondary">
                 양식 다시 선택
               </button>
             )}
@@ -754,21 +1251,25 @@ export default function JournalForm() {
       />
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <SectionCard title="양식 정보" description="선택한 양식과 저장 상태를 확인하세요.">
+        {/* 문서 메타 정보 */}
+        <SectionCard title="문서 기본 정보">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="양식 종류">
-              <div className={`inline-flex rounded-full border px-3 py-2 text-sm font-medium ${template.color}`}>
-                {template.label}
-              </div>
+            <LabeledField label="아동 선택">
+              <select value={form.clientId} onChange={(e) => handleClientChange(e.target.value)} className="input-field">
+                <option value="">직접 입력 (아동명은 양식에 입력)</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </LabeledField>
             <LabeledField label="저장 상태">
-              <StatusPills value={form.status} onChange={(value) => setField('status', value)} />
+              <StatusPills value={form.status} onChange={(v) => setField('status', v)} />
             </LabeledField>
             <LabeledField label="제목" required>
               <input
                 type="text"
                 value={form.title}
-                onChange={(event) => setField('title', event.target.value)}
+                onChange={(e) => setField('title', e.target.value)}
                 className="input-field"
                 placeholder={template.defaultTitle}
                 required
@@ -778,145 +1279,46 @@ export default function JournalForm() {
               <input
                 type="text"
                 value={form.summary}
-                onChange={(event) => setField('summary', event.target.value)}
+                onChange={(e) => setField('summary', e.target.value)}
                 className="input-field"
-                placeholder="핵심 내용을 짧게 정리해 두세요."
+                placeholder="핵심 내용을 짧게 정리"
               />
             </LabeledField>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={applySuggestion} className="btn-secondary">
-              <Sparkles size={14} />
-              제목·요약 초안 만들기
+              <Sparkles size={14} /> 제목·요약 초안 만들기
             </button>
-            <button
-              type="button"
-              onClick={applyRecentEntry}
-              disabled={recentSameType.length === 0}
-              className="btn-secondary disabled:opacity-50"
-            >
-              <Copy size={14} />
-              최근 같은 양식 복사
+            <button type="button" onClick={applyRecentEntry} disabled={recentSameType.length === 0} className="btn-secondary disabled:opacity-50">
+              <Copy size={14} /> 최근 같은 양식 복사
             </button>
             {hasDraft && (
               <button type="button" onClick={resetDraft} className="btn-secondary">
-                <RefreshCcw size={14} />
-                임시저장 비우기
+                <RefreshCcw size={14} /> 임시저장 비우기
               </button>
             )}
             {!isNew && (
               <button type="button" onClick={() => setDeleteConfirm(true)} className="btn-danger">
-                <Trash2 size={14} />
-                삭제
+                <Trash2 size={14} /> 삭제
               </button>
             )}
           </div>
 
+          {pdfError && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{pdfError}</div>
+          )}
           {saveError && (
-            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {saveError}
-            </div>
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>
           )}
           {(draftStatus || saved) && (
             <div className="rounded-2xl border border-sage-100 bg-sage-50 px-4 py-3 text-sm text-sage-700">
               {saved ? '저장되었습니다.' : draftStatus}
             </div>
           )}
-          {template.quickPhrases.length > 0 && (
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <p className="text-sm font-semibold text-gray-800">작성 힌트</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {template.quickPhrases.map((phrase) => (
-                  <span key={phrase} className="badge bg-white text-gray-600 border border-gray-200">
-                    {phrase}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </SectionCard>
 
-        <SectionCard title="아동 및 작성 기본정보" description="양식 상단에 들어가는 기본 정보를 입력하세요.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="아동 선택">
-              <select
-                value={form.clientId}
-                onChange={(event) => handleClientChange(event.target.value)}
-                className="input-field"
-              >
-                <option value="">직접 입력</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="아동명" required>
-              <input
-                type="text"
-                value={form.childName}
-                onChange={(event) => setField('childName', event.target.value)}
-                className="input-field"
-                required
-              />
-            </LabeledField>
-            <LabeledField label={currentType === JOURNAL_TYPES.INTERVIEW_LOG ? '상담일자' : currentType === JOURNAL_TYPES.PLAY_PLAN_GROUP ? '활동일시(날짜)' : '작성일자'}>
-              <input
-                type="date"
-                value={currentType === JOURNAL_TYPES.INTERVIEW_LOG ? form.consultationDate : form.date}
-                onChange={(event) => {
-                  if (currentType === JOURNAL_TYPES.INTERVIEW_LOG) setField('consultationDate', event.target.value);
-                  else setField('date', event.target.value);
-                }}
-                className="input-field"
-              />
-            </LabeledField>
-            <LabeledField label={currentType === JOURNAL_TYPES.PLAY_PLAN_GROUP ? '활동 시간' : '기록 시간'}>
-              <input
-                type="time"
-                value={form.time}
-                onChange={(event) => setField('time', event.target.value)}
-                className="input-field"
-              />
-            </LabeledField>
-            <LabeledField label="놀세이버명">
-              <input
-                type="text"
-                value={form.saverName}
-                onChange={(event) => setField('saverName', event.target.value)}
-                className="input-field"
-              />
-            </LabeledField>
-            <LabeledField label="작성자">
-              <input
-                type="text"
-                value={form.writerName}
-                onChange={(event) => setField('writerName', event.target.value)}
-                className="input-field"
-              />
-            </LabeledField>
-            <LabeledField label="작성일">
-              <input
-                type="date"
-                value={form.writerDate}
-                onChange={(event) => setField('writerDate', event.target.value)}
-                className="input-field"
-              />
-            </LabeledField>
-            <LabeledField label="협력기관 담당자 확인">
-              <input
-                type="text"
-                value={form.collaboratorConfirmed}
-                onChange={(event) => setField('collaboratorConfirmed', event.target.value)}
-                className="input-field"
-                placeholder="확인자명 또는 확인 여부"
-              />
-            </LabeledField>
-          </div>
-        </SectionCard>
-
+        {/* 양식 테이블 */}
         <TypeSpecificFields
           form={form}
           setField={setField}
@@ -957,451 +1359,12 @@ export default function JournalForm() {
               </div>
             </div>
             <div className="mt-5 flex gap-2">
-              <button type="button" onClick={handleDelete} className="btn-danger flex-1 justify-center">
-                삭제
-              </button>
-              <button type="button" onClick={() => setDeleteConfirm(false)} className="btn-secondary flex-1 justify-center">
-                취소
-              </button>
+              <button type="button" onClick={handleDelete} className="btn-danger flex-1 justify-center">삭제</button>
+              <button type="button" onClick={() => setDeleteConfirm(false)} className="btn-secondary flex-1 justify-center">취소</button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function TypeSpecificFields({ form, setField, updateRow, addRow, removeRow, fillPlanRowsByPeriod }) {
-  if (form.type === JOURNAL_TYPES.PLAY_PLAN_INDIVIDUAL) {
-    return (
-      <>
-        <SectionCard title="개별 놀이계획 기본항목" description="개별 놀이계획서 상단 항목을 입력하세요.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="상·하반기">
-              <select value={form.planPeriod} onChange={(event) => setField('planPeriod', event.target.value)} className="input-field">
-                {PLAN_PERIOD_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="아동연령">
-              <input type="text" value={form.childAge} onChange={(event) => setField('childAge', event.target.value)} className="input-field" placeholder="예: 9세" />
-            </LabeledField>
-            <LabeledField label="학년">
-              <input type="text" value={form.childGrade} onChange={(event) => setField('childGrade', event.target.value)} className="input-field" placeholder="예: 3학년" />
-            </LabeledField>
-            <LabeledField label="활동 시간">
-              <input type="text" value={form.activityTimeText} onChange={(event) => setField('activityTimeText', event.target.value)} className="input-field" placeholder="예: 주 1회, 회기당 50분" />
-            </LabeledField>
-            <LabeledField label="활동 기간">
-              <input type="date" value={form.activityStartDate} onChange={(event) => setField('activityStartDate', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="활동 기간 종료">
-              <input type="date" value={form.activityEndDate} onChange={(event) => setField('activityEndDate', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="총 회기수">
-              <input type="text" value={form.weeklyCountText} onChange={(event) => setField('weeklyCountText', event.target.value)} className="input-field" placeholder="예: 총 12회기" />
-            </LabeledField>
-            <LabeledField label="현행 수준">
-              <input type="text" value={form.currentLevel} onChange={(event) => setField('currentLevel', event.target.value)} className="input-field" />
-            </LabeledField>
-          </div>
-          <LabeledField label="놀이 목표">
-            <textarea value={form.playGoal} onChange={(event) => setField('playGoal', event.target.value)} rows={4} className="input-field resize-none" />
-          </LabeledField>
-        </SectionCard>
-
-        <SectionCard
-          title="월별 놀이 활동 계획"
-          description="PDF 양식의 회차·놀이영역·활동계획안 번호·장소 및 준비물을 월별로 정리합니다."
-          actions={(
-            <button type="button" onClick={fillPlanRowsByPeriod} className="btn-secondary">
-              <RefreshCcw size={14} />
-              {form.planPeriod} 기본 행 채우기
-            </button>
-          )}
-        >
-          <div className="space-y-4">
-            {form.planRows.map((row, index) => (
-              <div key={row.id} className="rounded-2xl border border-gray-200 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-gray-900">계획 행 {index + 1}</p>
-                  <button type="button" onClick={() => removeRow('planRows', row.id)} className="text-sm text-red-500">
-                    삭제
-                  </button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <LabeledField label="월">
-                    <input type="text" value={row.month} onChange={(event) => updateRow('planRows', row.id, 'month', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="회기수">
-                    <input type="text" value={row.sessionCount} onChange={(event) => updateRow('planRows', row.id, 'sessionCount', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="놀이 영역">
-                    <input type="text" value={row.playArea} onChange={(event) => updateRow('planRows', row.id, 'playArea', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="활동 내용">
-                    <textarea value={row.activityContent} onChange={(event) => updateRow('planRows', row.id, 'activityContent', event.target.value)} rows={3} className="input-field resize-none" />
-                  </LabeledField>
-                  <LabeledField label="활동계획안 번호">
-                    <input type="text" value={row.planNo} onChange={(event) => updateRow('planRows', row.id, 'planNo', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="활동 장소 및 구매 필요한 물품">
-                    <textarea value={row.placeMaterials} onChange={(event) => updateRow('planRows', row.id, 'placeMaterials', event.target.value)} rows={3} className="input-field resize-none" />
-                  </LabeledField>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button type="button" onClick={() => addRow('planRows', createPlanRow)} className="btn-secondary">
-            <PlusCircle size={14} />
-            계획 행 추가
-          </button>
-        </SectionCard>
-      </>
-    );
-  }
-
-  if (form.type === JOURNAL_TYPES.PLAY_PLAN_GROUP) {
-    return (
-      <>
-        <SectionCard title="소그룹·집단 놀이계획 기본항목" description="소그룹/집단 놀이계획서 상단 정보를 입력하세요.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="장소">
-              <input type="text" value={form.location} onChange={(event) => setField('location', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="참여 놀세이버 이름">
-              <input type="text" value={form.participantSaverNames} onChange={(event) => setField('participantSaverNames', event.target.value)} className="input-field" placeholder="쉼표로 구분" />
-            </LabeledField>
-            <LabeledField label="참여 아동 이름(연령)">
-              <input type="text" value={form.participantChildrenSummary} onChange={(event) => setField('participantChildrenSummary', event.target.value)} className="input-field" placeholder="예: 김민수(9세), 이수아(10세)" />
-            </LabeledField>
-            <LabeledField label="비고">
-              <input type="text" value={form.note} onChange={(event) => setField('note', event.target.value)} className="input-field" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="아동별 또래와의 놀이활동 수준" description="양식에 맞춰 아동별 놀이 수준과 특성을 기록하세요.">
-          <div className="space-y-4">
-            {form.peerLevelRows.map((row, index) => (
-              <div key={row.id} className="rounded-2xl border border-gray-200 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-gray-900">참여 아동 {index + 1}</p>
-                  <button type="button" onClick={() => removeRow('peerLevelRows', row.id)} className="text-sm text-red-500">
-                    삭제
-                  </button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <LabeledField label="아동명">
-                    <input type="text" value={row.childName} onChange={(event) => updateRow('peerLevelRows', row.id, 'childName', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="또래와의 놀이활동 수준">
-                    <input type="text" value={row.playLevel} onChange={(event) => updateRow('peerLevelRows', row.id, 'playLevel', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="특성 및 메모">
-                    <textarea value={row.notes} onChange={(event) => updateRow('peerLevelRows', row.id, 'notes', event.target.value)} rows={3} className="input-field resize-none" />
-                  </LabeledField>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button type="button" onClick={() => addRow('peerLevelRows', createPeerLevelRow)} className="btn-secondary">
-            <PlusCircle size={14} />
-            참여 아동 추가
-          </button>
-        </SectionCard>
-
-        <SectionCard title="매칭 특성 및 활동 목표" description="PDF의 설명 문항 순서대로 작성하세요.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <LabeledField label="소그룹 매칭 특성 및 활동 목표">
-              <textarea value={form.matchingGoal} onChange={(event) => setField('matchingGoal', event.target.value)} rows={5} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="놀이 활동 계획">
-              <textarea value={form.groupPlan} onChange={(event) => setField('groupPlan', event.target.value)} rows={5} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="구매 필요한 물품(협조 요청 사항)">
-              <textarea value={form.neededMaterials} onChange={(event) => setField('neededMaterials', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="활동 계획 메모">
-              <textarea value={form.summary} onChange={(event) => setField('summary', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-      </>
-    );
-  }
-
-  if (form.type === JOURNAL_TYPES.INTERVIEW_LOG) {
-    return (
-      <>
-        <SectionCard title="면담 기본항목" description="면담/상담 일지의 상단 정보와 수행 방식을 기록하세요.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="면담자(보호자명)">
-              <input type="text" value={form.intervieweeName} onChange={(event) => setField('intervieweeName', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="상담 수행 방법 구분">
-              <select value={form.consultationMethod} onChange={(event) => setField('consultationMethod', event.target.value)} className="input-field">
-                {CONSULTATION_METHOD_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="상담정보제공자">
-              <select value={form.infoProvider} onChange={(event) => setField('infoProvider', event.target.value)} className="input-field">
-                {INFO_PROVIDER_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="기타 정보제공자">
-              <input type="text" value={form.infoProviderDetail} onChange={(event) => setField('infoProviderDetail', event.target.value)} className="input-field" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="상담(면담) 내용" description="놀이활동 내용, 변화, 특이사항, 향후 계획 공유 내용을 한 번에 기록하세요.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <LabeledField label="상담(면담)내용">
-              <textarea value={form.consultationContent} onChange={(event) => setField('consultationContent', event.target.value)} rows={8} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="향후 개입 계획 및 보호자 상담 결과">
-              <textarea value={form.futurePlan} onChange={(event) => setField('futurePlan', event.target.value)} rows={8} className="input-field resize-none" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-      </>
-    );
-  }
-
-  if (form.type === JOURNAL_TYPES.INITIAL_CONSULTATION) {
-    return (
-      <>
-        <SectionCard title="초기상담 기본정보" description="기본 인적사항과 건강 관련 특이사항을 먼저 작성하세요.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="생년월일">
-              <input type="date" value={form.birthDate} onChange={(event) => setField('birthDate', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="성별">
-              <input type="text" value={form.gender} onChange={(event) => setField('gender', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="장애 유형">
-              <input type="text" value={form.disabilityType} onChange={(event) => setField('disabilityType', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="장애 정도">
-              <input type="text" value={form.disabilityLevel} onChange={(event) => setField('disabilityLevel', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="비상연락처">
-              <input type="text" value={form.emergencyContact} onChange={(event) => setField('emergencyContact', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="아동 질병/질환(건강상 특이사항)">
-              <textarea value={form.healthNotes} onChange={(event) => setField('healthNotes', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="가족관계" description="가족 구성원을 표 형식으로 입력하세요.">
-          <div className="space-y-4">
-            {form.familyRows.map((row, index) => (
-              <div key={row.id} className="rounded-2xl border border-gray-200 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-gray-900">가족 구성원 {index + 1}</p>
-                  <button type="button" onClick={() => removeRow('familyRows', row.id)} className="text-sm text-red-500">
-                    삭제
-                  </button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                  <LabeledField label="관계">
-                    <input type="text" value={row.relation} onChange={(event) => updateRow('familyRows', row.id, 'relation', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="이름">
-                    <input type="text" value={row.name} onChange={(event) => updateRow('familyRows', row.id, 'name', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="연령">
-                    <input type="text" value={row.age} onChange={(event) => updateRow('familyRows', row.id, 'age', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="장애유무">
-                    <input type="text" value={row.disability} onChange={(event) => updateRow('familyRows', row.id, 'disability', event.target.value)} className="input-field" />
-                  </LabeledField>
-                  <LabeledField label="특이사항">
-                    <textarea value={row.notes} onChange={(event) => updateRow('familyRows', row.id, 'notes', event.target.value)} rows={3} className="input-field resize-none" />
-                  </LabeledField>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button type="button" onClick={() => addRow('familyRows', createFamilyRow)} className="btn-secondary">
-            <PlusCircle size={14} />
-            가족 구성원 추가
-          </button>
-        </SectionCard>
-
-        <SectionCard title="여가 시간 및 또래관계" description="초기상담기록지 문항 순서대로 적을 수 있게 나눴습니다.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <LabeledField label="가정이나 지역사회에서 즐겨하는 활동은?">
-              <textarea value={form.leisureActivity} onChange={(event) => setField('leisureActivity', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="자주 가는 곳(공간)은?">
-              <textarea value={form.frequentPlace} onChange={(event) => setField('frequentPlace', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="혼자 노는 시간은 얼마나 되나요?">
-              <select value={form.soloPlayTimeRange} onChange={(event) => setField('soloPlayTimeRange', event.target.value)} className="input-field">
-                {SOLO_PLAY_TIME_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="장난감 종류(다양성)">
-              <select value={form.toyTypeLevel} onChange={(event) => setField('toyTypeLevel', event.target.value)} className="input-field">
-                {LEVEL_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="장난감 양(갯수)">
-              <select value={form.toyQuantityLevel} onChange={(event) => setField('toyQuantityLevel', event.target.value)} className="input-field">
-                {LEVEL_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="장난감 관련 추가 메모">
-              <textarea value={form.toyTypeDescription} onChange={(event) => setField('toyTypeDescription', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="친구와 주로 하는 활동은?">
-              <textarea value={form.peerActivities} onChange={(event) => setField('peerActivities', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="또래 관계에 대해 알고 있어야 할 부분은?">
-              <textarea value={form.peerNotes} onChange={(event) => setField('peerNotes', event.target.value)} rows={4} className="input-field resize-none" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="진로·욕구·주의사항" description="아동의 욕구와 주의해야 할 점을 실무용으로 정리하세요.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <LabeledField label="아동의 꿈은?">
-              <textarea value={form.dream} onChange={(event) => setField('dream', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="아동의 특기는?">
-              <textarea value={form.strengths} onChange={(event) => setField('strengths', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="아동이 가장 즐겨 하는 것은 무엇입니까?">
-              <textarea value={form.favoriteThings} onChange={(event) => setField('favoriteThings', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="보호자와 아동이 이 서비스를 통해 얻고 싶은 점">
-              <textarea value={form.serviceGoals} onChange={(event) => setField('serviceGoals', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="문제행동이나 자극이 되는 부분">
-              <textarea value={form.cautionBehavior} onChange={(event) => setField('cautionBehavior', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="질병과 알레르기">
-              <textarea value={form.cautionHealth} onChange={(event) => setField('cautionHealth', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="돌발행동 상황에서 놀이교사가 대처할 수 있는 Tip">
-              <textarea value={form.cautionTips} onChange={(event) => setField('cautionTips', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="외부 놀이를 희망하시나요?">
-              <textarea value={form.outdoorPlayWish} onChange={(event) => setField('outdoorPlayWish', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="외부 놀이 시 주의해야 할 점은?">
-              <textarea value={form.outdoorPlayNotes} onChange={(event) => setField('outdoorPlayNotes', event.target.value)} rows={3} className="input-field resize-none" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-      </>
-    );
-  }
-
-  if (form.type === JOURNAL_TYPES.ACTIVITY_LOG) {
-    return (
-      <>
-        <SectionCard title="활동일지 기본항목" description="활동일지 1쪽 상단 항목과 활동 기본정보를 입력하세요.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <LabeledField label="회차">
-              <input type="text" value={form.sessionNumber} onChange={(event) => setField('sessionNumber', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="누적 시간">
-              <input type="text" value={form.cumulativeHours} onChange={(event) => setField('cumulativeHours', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="놀세이버명(소그룹 구성원)">
-              <input type="text" value={form.saverMembers} onChange={(event) => setField('saverMembers', event.target.value)} className="input-field" placeholder="쉼표로 구분" />
-            </LabeledField>
-            <LabeledField label="아동명(소그룹 구성원)">
-              <input type="text" value={form.childParticipants} onChange={(event) => setField('childParticipants', event.target.value)} className="input-field" placeholder="쉼표로 구분" />
-            </LabeledField>
-            <LabeledField label="활동계획안 NO.">
-              <input type="text" value={form.activityPlanNo} onChange={(event) => setField('activityPlanNo', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="활동구분">
-              <select value={form.activityKind} onChange={(event) => setField('activityKind', event.target.value)} className="input-field">
-                {ACTIVITY_KIND_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="활동장소">
-              <input type="text" value={form.activityPlace} onChange={(event) => setField('activityPlace', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="만족도">
-              <select value={form.satisfaction} onChange={(event) => setField('satisfaction', event.target.value)} className="input-field">
-                {SATISFACTION_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </LabeledField>
-            <LabeledField label="활동 주제">
-              <input type="text" value={form.activitySubject} onChange={(event) => setField('activitySubject', event.target.value)} className="input-field" />
-            </LabeledField>
-            <LabeledField label="놀잇감/사용 교구">
-              <input type="text" value={form.playMaterials} onChange={(event) => setField('playMaterials', event.target.value)} className="input-field" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="활동 내용 기록" description="활동일지 본문 문항 순서에 맞춰 기록합니다.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <LabeledField label="세부 활동내용">
-              <textarea value={form.detailedActivities} onChange={(event) => setField('detailedActivities', event.target.value)} rows={6} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="놀이과정">
-              <textarea value={form.playProcess} onChange={(event) => setField('playProcess', event.target.value)} rows={6} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="관찰내용">
-              <textarea value={form.content} onChange={(event) => setField('content', event.target.value)} rows={6} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="놀세이버와 또래아동 이야기 나눈 내용 등">
-              <textarea value={form.conversationNotes} onChange={(event) => setField('conversationNotes', event.target.value)} rows={6} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="놀세이버 의견(아동의 변화, 보호자 면담 내용 등)">
-              <textarea value={form.saverOpinion} onChange={(event) => setField('saverOpinion', event.target.value)} rows={5} className="input-field resize-none" />
-            </LabeledField>
-            <LabeledField label="활동 평가 및 의견">
-              <textarea value={form.activityEvaluation} onChange={(event) => setField('activityEvaluation', event.target.value)} rows={5} className="input-field resize-none" />
-            </LabeledField>
-          </div>
-        </SectionCard>
-      </>
-    );
-  }
-
-  return null;
 }
